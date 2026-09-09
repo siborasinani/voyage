@@ -1,0 +1,40 @@
+-- Voyage — adds a per-user default currency preference to `profiles`
+--
+-- Run this once, after 0001-0014, in the Supabase SQL Editor.
+--
+-- Background: a brand-new personal trip budget (SetBudget.jsx) has
+-- always defaulted its currency to a hardcoded 'USD' the moment none
+-- is already set — and since expenses have no currency column of their
+-- own (they're always displayed in whatever currency the viewer's
+-- personal budget for that trip is set to — see BudgetSection.jsx's own
+-- comment on `currency`), that same 'USD' fallback is effectively the
+-- starting currency for a trip's expenses too, until a budget exists.
+-- This column lets a signed-in user set their own default instead of
+-- always landing on USD — read once and used only as the next
+-- *initial* value for something new; it never touches an already-set
+-- budget's own currency (see SetBudget.jsx's own fallback chain,
+-- `budget?.currency ?? defaultCurrency ?? 'USD'` — the existing value
+-- always wins the moment one exists, both there and in
+-- BudgetSection.jsx's own `currency`).
+--
+-- A plain nullable column on the existing `profiles` table, not a new
+-- table: this is exactly the same kind of single-value-per-user
+-- preference `display_name`/`avatar_url` already are (0001_init.sql),
+-- and both of RLS's existing policies on `profiles` — "profiles are
+-- readable by authenticated users" (select, using (true)) and "users
+-- can update their own profile" (update, using (auth.uid() = id)) —
+-- are row-level, not column-scoped, so this new column is already
+-- covered by both with zero policy changes. Same for the table-level
+-- grants already in place (0003_fix_trips_access.sql's `grant select,
+-- insert, update, delete on public.profiles to authenticated`) — a
+-- new column needs no new grant either.
+--
+-- No default forced at the database level: every existing row gets
+-- NULL, which the app reads as "no preference set yet, fall back to
+-- USD" (see services/profilesRepository.js's getDefaultCurrency) —
+-- never a silently-invented value nobody actually chose. Nothing here
+-- reads or writes `trips`/`trip_member_budgets`/`expenses` — no
+-- existing budget or expense data is touched by adding this column.
+
+alter table public.profiles
+  add column if not exists default_currency text;

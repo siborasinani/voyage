@@ -1,0 +1,41 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Environment variables (contains the local Geoapify API key — see .env.example)
+.env
+.env.*
+!.env.example
+
+# Supabase CLI's own local cache (just a version-check string, created
+# on any `supabase ...` invocation — not project config, not a secret,
+# just machine-local CLI state with nothing worth tracking)
+supabase/.temp
+
+# One-time, already-run database maintenance script that names real
+# account ids/display names from this project's live Supabase project
+# — operational history, not something that belongs in a published
+# repo. See the final repo-prep report for the full reasoning; kept
+# locally, never committed.
+supabase/cleanup_test_accounts.sql
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

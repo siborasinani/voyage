@@ -1,0 +1,4253 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* Lets a plain `element.scrollIntoView({ block: 'start' })` call (no
+   `behavior` specified — see TripPage.jsx's in-page section nav) ease
+   into place instead of jumping instantly, while automatically
+   deferring to the existing `prefers-reduced-motion` block below
+   (which already forces `scroll-behavior: auto !important` back on
+   for anyone who's asked for reduced motion) — no separate
+   reduced-motion handling needed in JS. */
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family:
+    Inter,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  background: #f7f7f5;
+  color: #171717;
+}
+
+button,
+a {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+/* ---------- MOTION ----------
+   A small, shared set of transitions/keyframes used throughout the
+   rest of this file, instead of every component inventing its own —
+   kept deliberately subtle (short durations, small offsets, no
+   bounce/elastic easing) so the app reads as polished rather than
+   animated. The reduced-motion block below is the one blanket
+   safety net: every animation/transition in this file is effectively
+   instant for a user who has asked for reduced motion, with no need
+   to special-case each rule individually. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@keyframes overlay-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes modal-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}
+
+@keyframes popover-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes save-confirm-pop {
+  45% {
+    transform: scale(1.06);
+  }
+}
+
+/* A view-level page (the dashboard's own <main>, .trip-page,
+   .explore-page) fades in on mount — since each is only ever rendered
+   conditionally (see App.jsx), swapping between My Trips / a trip /
+   Explore mounts a fresh <main> every time, so this alone covers every
+   real navigation without any JS/router involvement. */
+main {
+  animation: fade-in 0.2s ease;
+}
+
+/* Every dropdown/popover in the app (mobile nav, the three custom
+   pickers, destination autocomplete) gets the same quiet entrance
+   instead of just snapping open. */
+.mobile-menu-panel,
+.category-select-menu,
+.time-picker-popover,
+.date-picker-popover,
+.destination-search-suggestions {
+  animation: popover-in 0.15s ease;
+}
+
+.app {
+  min-height: 100vh;
+}
+
+/* ---------- NAVBAR ---------- */
+
+.navbar {
+  height: 76px;
+  padding: 0 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #ffffff;
+  border-bottom: 1px solid #e8e8e5;
+}
+
+.logo {
+  text-decoration: none;
+  color: #171717;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+}
+
+.nav-links {
+  display: flex;
+  gap: 32px;
+}
+
+.nav-links a {
+  text-decoration: none;
+  color: #5f5f5f;
+  font-size: 14px;
+  font-weight: 500;
+  transition: color 0.2s ease;
+}
+
+.nav-links a:hover {
+  color: #171717;
+}
+
+.nav-links a.is-active {
+  color: #171717;
+  font-weight: 600;
+}
+
+.nav-links a:focus-visible,
+.logo:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(23, 23, 23, 0.18);
+  border-radius: 4px;
+}
+
+/* The right-hand "account controls" cluster — hamburger (mobile only),
+   notification bell, profile avatar — kept as one tightly-spaced group
+   rather than left to .navbar's own space-between, which used to
+   spread the bell and the avatar apart as if they were unrelated
+   top-level nav items instead of belonging to the same account area. */
+/* The positioned ancestor for .notification-popover's `right: 0`
+   (see NOTIFICATIONS below) — deliberately anchored here, not on
+   .notification-bell itself, so the popover's right edge lines up
+   with the account cluster's true right edge (flush with the
+   navbar's own edge) regardless of what else shares this row. Bell
+   used to be the last item before the profile button with the
+   navbar's own space-between doing the alignment; now that both live
+   inside this tighter group, anchoring to .notification-bell alone
+   would leave the popover's right edge stranded under the bell,
+   short by a profile-button-width + gap — harmless on a wide desktop
+   viewport, but enough to push the whole popover off the left edge
+   of a 390px screen. */
+.nav-account {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Hidden on desktop — becomes the only way to reach the nav links once
+   .nav-links is hidden below the mobile breakpoint. */
+.mobile-nav {
+  display: none;
+  position: relative;
+}
+
+.mobile-menu-button {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #d9d9d6;
+  border-radius: 10px;
+  background: white;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.mobile-menu-button:hover {
+  border-color: #bcbcb8;
+}
+
+.mobile-menu-icon {
+  position: relative;
+  width: 18px;
+  height: 2px;
+  background: #171717;
+  border-radius: 1px;
+}
+
+.mobile-menu-icon::before,
+.mobile-menu-icon::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  width: 18px;
+  height: 2px;
+  background: #171717;
+  border-radius: 1px;
+}
+
+.mobile-menu-icon::before {
+  top: -6px;
+}
+
+.mobile-menu-icon::after {
+  top: 6px;
+}
+
+.mobile-menu-panel {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 40;
+  min-width: 180px;
+  max-width: calc(100vw - 48px);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: white;
+  border: 1px solid #e5e5e2;
+  border-radius: 14px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.14);
+}
+
+.mobile-menu-item {
+  display: block;
+  padding: 12px 14px;
+  border-radius: 8px;
+  color: #171717;
+  text-decoration: none;
+  font-size: 15px;
+  font-weight: 500;
+  transition: background-color 0.12s ease;
+}
+
+.mobile-menu-item:hover {
+  background: #f2f2ef;
+}
+
+.mobile-menu-item.is-active {
+  background: #171717;
+  color: white;
+  font-weight: 600;
+}
+
+.profile-button {
+  width: 38px;
+  height: 38px;
+  border: none;
+  border-radius: 50%;
+  background: #171717;
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  transition: box-shadow 0.15s ease;
+}
+
+/* A quiet wayfinding cue that Profile is the current page — the
+   avatar itself is Profile's only nav entry point (see App.jsx), so
+   there's no nav-links "is-active" text link to lean on the way
+   My Trips/Explore/Friends each have. */
+.profile-button.is-active {
+  box-shadow: 0 0 0 2px white, 0 0 0 4px #171717;
+}
+
+/* The one shared "photo instead of initials" treatment — see
+   components/Avatar.jsx. Paired with whichever sizing/circular class
+   already exists at each call site (.friend-avatar,
+   .profile-header-avatar, .profile-button-avatar below); this only
+   ever adds the image-specific crop behavior. */
+.avatar-image {
+  object-fit: cover;
+}
+
+.profile-button-avatar {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+}
+
+/* An interactive avatar (see components/Avatar.jsx's own onClick
+   contract) — a real <button>, so this resets the browser's own
+   button chrome rather than fighting it, then relies entirely on
+   whatever sizing/circular/color class is already paired with it
+   (.friend-avatar, .profile-header-avatar, ...) for its actual look.
+   A quiet ring on hover/focus is the only new affordance — no color
+   change, no scale-on-hover, nothing that would make an avatar read
+   as a bigger, louder control than it is. */
+.avatar-button {
+  display: block;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-weight: inherit;
+  cursor: pointer;
+  transition: box-shadow 0.15s ease, transform 0.1s ease;
+}
+
+.avatar-button:hover {
+  box-shadow: 0 0 0 2px rgba(23, 23, 23, 0.14);
+}
+
+.avatar-button:active {
+  transform: scale(0.96);
+}
+
+.avatar-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(23, 23, 23, 0.18);
+}
+
+/* The <img> inside a photo avatar-button fills exactly the button's
+   own box (whatever width/height/border-radius its paired sizing
+   class set) rather than needing its own size. */
+.avatar-button .avatar-image {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  display: block;
+}
+
+/* The one notification-count badge in the app (see
+   components/NotificationBell.jsx — it replaced an earlier
+   Friends-nav-only version of this same badge) — a plain inline-flex
+   circle, reused as a plain inline element after nav link text
+   wherever a badge is still needed, and repositioned absolutely inside
+   .notification-bell-button below for that specific context. Never
+   rendered at all at a 0 count or for a signed-out visitor, rather
+   than rendered-but-empty. */
+.nav-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #171717;
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  vertical-align: middle;
+}
+
+/* ---------- NOTIFICATIONS ---------- */
+
+
+/* Same size/shape as .mobile-menu-button right next to it — a quiet,
+   bordered square icon button, not a louder standalone control. */
+.notification-bell-button {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #d9d9d6;
+  border-radius: 10px;
+  background: white;
+  cursor: pointer;
+  line-height: 1;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.notification-bell-button:hover {
+  border-color: #bcbcb8;
+}
+
+.notification-bell-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(23, 23, 23, 0.18);
+}
+
+/* A plain outline SVG (inlined in NotificationBell.jsx, not an emoji
+   or a filled/cartoon glyph) — currentColor so it always matches the
+   navbar's existing icon-button color (same #171717 as
+   .mobile-menu-icon right next to it), no separate icon font/library
+   needed for one glyph. */
+.notification-bell-icon {
+  width: 19px;
+  height: 19px;
+  color: #171717;
+}
+
+.notification-bell-button .nav-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  margin-left: 0;
+  border: 2px solid white;
+}
+
+.notification-popover {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 40;
+  width: min(360px, calc(100vw - 48px));
+  max-height: 480px;
+  overflow-y: auto;
+  padding: 16px;
+  background: white;
+  border: 1px solid #e5e5e2;
+  border-radius: 14px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.14);
+  animation: popover-in 0.15s ease;
+}
+
+.notification-popover-header h3 {
+  font-size: 16px;
+  letter-spacing: -0.01em;
+  margin-bottom: 12px;
+}
+
+.notification-popover-empty {
+  min-height: 0;
+  margin-top: 0;
+  padding: 28px 12px;
+}
+
+.notification-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.notification-item {
+  display: flex;
+  gap: 10px;
+  padding: 12px 4px;
+  border-bottom: 1px solid #eeeeec;
+}
+
+.notification-item:last-child {
+  border-bottom: none;
+}
+
+.notification-item-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.notification-item-text {
+  font-size: 13px;
+  line-height: 1.5;
+  color: #171717;
+  overflow-wrap: anywhere;
+}
+
+.notification-item.is-informational .notification-item-text {
+  color: #5f5f5f;
+}
+
+.notification-item-time {
+  font-size: 12px;
+  color: #8c8c86;
+}
+
+.notification-item-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.notification-popover-footer-link {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding-top: 12px;
+  border: none;
+  border-top: 1px solid #eeeeec;
+  background: none;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: #171717;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.notification-popover-footer-link:hover {
+  color: #5f5f5f;
+}
+
+/* ---------- HERO ---------- */
+
+main {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 40px 80px;
+}
+
+.hero {
+  padding: 100px 0 90px;
+  max-width: 760px;
+}
+
+.eyebrow,
+.section-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: #737373;
+}
+
+.eyebrow {
+  margin-bottom: 22px;
+}
+
+.hero h1 {
+  font-size: clamp(48px, 6vw, 76px);
+  line-height: 0.98;
+  letter-spacing: -0.055em;
+  font-weight: 650;
+  max-width: 800px;
+}
+
+.hero-text {
+  margin-top: 28px;
+  max-width: 540px;
+  color: #666;
+  font-size: 18px;
+  line-height: 1.6;
+}
+
+/* A short, concrete "what this actually does" — three short columns
+   under the hero's own CTA, reusing .section-label (the same uppercase
+   eyebrow style used for every other section heading) rather than a
+   new label style. */
+.hero-highlights {
+  margin-top: 56px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  max-width: 680px;
+}
+
+.hero-highlights p:last-child {
+  margin-top: 8px;
+  color: #5f5f5f;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* A signed-in user with no trips yet: still an intro, but noticeably
+   lighter than the full marketing hero above — smaller heading, less
+   vertical padding, no eyebrow-sized headline dominating the page. */
+.hero-welcome {
+  padding: 64px 0 44px;
+}
+
+.hero-welcome h1 {
+  font-size: clamp(32px, 4vw, 42px);
+  letter-spacing: -0.04em;
+}
+
+/* A signed-in user who already has trips: no hero at all — a compact,
+   utility-focused header instead, so their actual trips (in
+   .trips-section, right below) sit as high in the page as possible.
+   Mirrors .section-heading's own label + heading + action layout
+   rather than introducing a new pattern. */
+.returning-header {
+  padding: 48px 0 28px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.returning-header h2 {
+  font-size: clamp(26px, 3vw, 32px);
+  line-height: 1.1;
+  letter-spacing: -0.035em;
+}
+
+.returning-header-text {
+  margin-top: 6px;
+  color: #707070;
+  font-size: 15px;
+}
+
+.returning-header .primary-button {
+  margin-top: 0;
+  flex-shrink: 0;
+}
+
+/* ---------- BUTTONS ---------- */
+
+.primary-button,
+.secondary-button {
+  border-radius: 10px;
+  padding: 13px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  transition:
+    transform 0.2s ease,
+    background 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.primary-button {
+  margin-top: 32px;
+  border: 1px solid #171717;
+  background: #171717;
+  color: white;
+}
+
+.primary-button:hover {
+  background: #2b2b2b;
+  transform: translateY(-1px);
+}
+
+.secondary-button {
+  border: 1px solid #d9d9d6;
+  background: white;
+  color: #171717;
+}
+
+.secondary-button:hover {
+  border-color: #bcbcb8;
+}
+
+/* A quick, small press — after :hover in source order so it wins over
+   the hover lift while a button is actively being clicked/tapped. */
+.primary-button:active,
+.secondary-button:active {
+  transform: scale(0.97);
+}
+
+.primary-button:disabled,
+.secondary-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.primary-button:focus-visible,
+.secondary-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(23, 23, 23, 0.18);
+}
+
+/* ---------- TRIPS ---------- */
+
+.trips-section {
+  padding-top: 20px;
+}
+
+/* A clearer break before Past Trips than the 20px above (which reads
+   fine right below the hero, but Past Trips follows a whole populated
+   Upcoming trip list) — matches the ~48px gap already used before
+   Saved Places/Budget on the trip detail page. */
+.past-trips-section,
+.shared-trips-section,
+.dashboard-friends-section,
+.dashboard-activity-section {
+  padding-top: 48px;
+}
+
+/* ---------- POPULAR DESTINATIONS (homepage) ---------- */
+
+.destinations-section {
+  padding-top: 56px;
+}
+
+.destination-strip {
+  margin-top: 24px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.destination-card {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  border: 1px solid #dededb;
+  border-radius: 16px;
+  background: white;
+  overflow: hidden;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.destination-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.07);
+  border-color: #cfcfca;
+}
+
+.destination-card:active {
+  transform: scale(0.98);
+}
+
+.destination-card:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(23, 23, 23, 0.18);
+}
+
+.destination-card-image,
+.destination-card-image-fallback {
+  display: block;
+  width: 100%;
+  height: 110px;
+  object-fit: cover;
+}
+
+.destination-card-image-fallback {
+  background: linear-gradient(135deg, #f6f6f3, #eaeae6);
+}
+
+.destination-card-name {
+  padding: 12px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #171717;
+}
+
+/* Shown only inside the signed-in, zero-trips empty state (see
+   App.jsx) — sits below the existing empty-state card rather than
+   inside it, so every other reuse of .empty-state (Saved Places,
+   Budget, Expenses) is completely unaffected. */
+.destinations-suggestion {
+  margin-top: 24px;
+}
+
+.destinations-suggestion .section-label {
+  margin-bottom: 8px;
+}
+
+@media (max-width: 800px) {
+  .hero-highlights {
+    grid-template-columns: 1fr;
+    gap: 20px;
+    margin-top: 40px;
+  }
+
+  .destination-strip {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.section-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  padding-bottom: 22px;
+  border-bottom: 1px solid #dededb;
+}
+
+.section-label {
+  margin-bottom: 8px;
+}
+
+.section-heading h2 {
+  font-size: 28px;
+  line-height: 1.1;
+  letter-spacing: -0.035em;
+}
+
+/* ---------- EMPTY STATE ---------- */
+
+.empty-state {
+  margin-top: 24px;
+  min-height: 300px;
+  border: 1px solid #dededb;
+  border-radius: 16px;
+  background: white;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 40px;
+  animation: fade-in-up 0.3s ease;
+}
+
+/* A loading empty-state (e.g. "Loading your trips…") gets the same
+   quiet breathing pulse already used for an unresolved image, rather
+   than sitting perfectly static while something is happening. */
+.empty-state.is-loading {
+  animation: place-image-fallback-pulse 1.6s ease-in-out infinite;
+}
+
+.empty-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #f0f0ed;
+  font-size: 20px;
+  margin-bottom: 18px;
+}
+
+.empty-state h3 {
+  font-size: 20px;
+  letter-spacing: -0.02em;
+}
+
+.empty-state p {
+  max-width: 360px;
+  margin-top: 8px;
+  color: #707070;
+  line-height: 1.5;
+}
+
+/* ---------- RESPONSIVE ---------- */
+
+@media (max-width: 800px) {
+  .navbar {
+    padding: 0 24px;
+  }
+
+  .nav-links {
+    display: none;
+  }
+
+  .mobile-nav {
+    display: block;
+  }
+
+  main {
+    padding: 0 20px 60px;
+  }
+
+  .hero {
+    padding: 72px 0 64px;
+  }
+
+  .hero h1 {
+    font-size: clamp(42px, 12vw, 60px);
+  }
+
+  .hero-text {
+    font-size: 16px;
+  }
+
+  .hero-welcome {
+    padding: 48px 0 36px;
+  }
+
+  .returning-header {
+    padding: 36px 0 24px;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .returning-header .primary-button {
+    width: 100%;
+  }
+
+  .section-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 16px;
+  }
+}
+
+/* ---------- CREATE TRIP MODAL ---------- */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  justify-content: center;
+  padding: 24px;
+  z-index: 100;
+  overflow-y: auto;
+  animation: overlay-fade-in 0.18s ease;
+}
+
+.modal {
+  width: min(100%, 520px);
+  /* Auto top/bottom margins center the modal vertically instead of
+     the overlay's own `align-items: center` — a flex container with
+     align-items: center and overflow: auto has a well-known quirk
+     where content overflowing the *start* edge (here, the top of a
+     modal taller than the viewport) can become unreachable by
+     scrolling even though the end/bottom scrolls fine. Auto margins on
+     the item achieve the same centered-when-it-fits look without that
+     trap: when the modal is short, they absorb the extra space exactly
+     like align-items: center would; when it's taller than the
+     viewport, they collapse to 0 and the overlay's own overflow-y:
+     auto (above) can scroll all the way to both the top and the
+     bottom. */
+  margin: auto 0;
+  background: white;
+  border-radius: 18px;
+  padding: 32px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+  animation: modal-pop-in 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* A compact, view-only lightbox (see components/AvatarViewer.jsx) —
+   deliberately much smaller than .modal and centered via plain
+   `margin: auto` (the same overlay, so the same top/bottom-scroll
+   reasoning above applies, though a card this small realistically
+   never needs it) rather than reusing .modal's own 520px width. */
+.avatar-viewer {
+  position: relative;
+  width: min(280px, calc(100vw - 48px));
+  margin: auto;
+  padding: 28px 24px 24px;
+  background: white;
+  border-radius: 18px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+  animation: modal-pop-in 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.avatar-viewer .close-button {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+}
+
+.avatar-viewer-image {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 16px;
+  object-fit: cover;
+  display: block;
+}
+
+.avatar-viewer-name {
+  margin-top: 14px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #171717;
+}
+
+@media (max-width: 600px) {
+  .avatar-viewer {
+    width: min(240px, calc(100vw - 48px));
+  }
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 28px;
+}
+
+.modal-header h2 {
+  margin-top: 8px;
+  font-size: 28px;
+  letter-spacing: -0.03em;
+}
+
+.close-button {
+  border: none;
+  background: transparent;
+  font-size: 28px;
+  color: #777;
+  line-height: 1;
+  border-radius: 8px;
+  transition: color 0.15s ease, transform 0.1s ease;
+}
+
+.close-button:hover {
+  color: #171717;
+}
+
+.close-button:active {
+  transform: scale(0.9);
+}
+
+.close-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(23, 23, 23, 0.18);
+}
+
+/* .settings-password-form (SettingsPage.jsx's Change password form)
+   shares every one of these four rules — same field/input look as
+   every modal form in the app, just reached from a form that isn't
+   inside a .modal this time (Settings is a real page, not a dialog).
+   Extending these selector lists, not writing a parallel copy, is
+   what keeps the two genuinely identical without duplicating a single
+   declaration. */
+.modal form,
+.settings-password-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.modal label,
+.settings-password-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+}
+
+.modal input,
+.modal select,
+.modal textarea,
+.settings-password-form input {
+  width: 100%;
+  padding: 13px 14px;
+  border: 1px solid #d9d9d6;
+  border-radius: 10px;
+  background: #fafaf8;
+  color: #171717;
+  font-size: 15px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s ease, background-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.modal textarea {
+  resize: vertical;
+}
+
+.modal input:focus,
+.modal select:focus,
+.modal textarea:focus,
+.settings-password-form input:focus {
+  border-color: #171717;
+  background: white;
+  box-shadow: 0 0 0 3px rgba(23, 23, 23, 0.08);
+}
+
+/* The one rule that's genuinely new, not shared with .modal: a form
+   inside a .modal already sits inside that card's own 32px padding, but
+   .settings-password-form sits directly inside a bare .profile-info-card
+   (no padding of its own — see PROFILE below), so it needs its own. */
+.settings-password-form {
+  padding: 20px 24px;
+}
+
+/* Normalize the native date/time pickers so their icon fits Voyage's
+   quiet, neutral visual language instead of the browser default. */
+.modal input[type="date"],
+.modal input[type="time"] {
+  color-scheme: light;
+}
+
+.modal input[type="date"]::-webkit-calendar-picker-indicator,
+.modal input[type="time"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.55;
+  transition: opacity 0.15s ease;
+}
+
+.modal input[type="date"]:hover::-webkit-calendar-picker-indicator,
+.modal input[type="time"]:hover::-webkit-calendar-picker-indicator {
+  opacity: 1;
+}
+
+.date-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.form-error {
+  margin: -8px 0 0;
+  font-size: 13px;
+  color: #c0392b;
+}
+
+/* Non-blocking (see CreateTrip.jsx) — a distinct amber tone from
+   .form-error's red is what signals "notice this" rather than "fix
+   this before continuing". Same palette as the itinerary's own
+   .activity-overlap-warning pill for a same-day activity time clash —
+   the same underlying idea (two things sharing a date/time), just a
+   block instead of an inline pill since this can name more than one
+   trip. */
+.trip-date-overlap-warning {
+  margin-top: -8px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #fdf0e0;
+  color: #9a5b0f;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.trip-date-overlap-warning strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+
+.submit-button {
+  width: 100%;
+  margin-top: 4px;
+}
+
+.auth-mode-toggle {
+  width: 100%;
+  margin-top: 16px;
+}
+
+@media (max-width: 600px) {
+  .modal {
+    padding: 24px;
+  }
+
+  .date-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Invite-friends modal (AddTripFriends.jsx) — a proper flex-column
+   footer layout, not a one-off absolute-position fix. The overlay
+   pads 24px top+bottom (.modal-overlay), so capping the modal at
+   `100vh - 48px` and making it a flex column lets exactly one region
+   (the friend list body) scroll internally while the header and the
+   Done-button footer stay fixed in place outside that scroll area —
+   this is what guarantees Done can never overlap the list, whether
+   there's 1 friend, 30, or the viewport itself is short. Scoped to
+   this modal only; the generic .modal used by every other dialog is
+   untouched. */
+.add-trip-friends-modal {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 48px);
+}
+
+.add-trip-friends-modal .modal-header {
+  flex-shrink: 0;
+}
+
+.add-trip-friends-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  /* Small negative margin + matching padding so the scrollbar (when
+     one appears) doesn't sit flush against the friend-list's own
+     border/rounded corners. */
+  margin: 0 -4px;
+  padding: 0 4px;
+}
+
+.add-trip-friends-footer {
+  flex-shrink: 0;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #eeeeec;
+}
+
+.trip-list {
+  display: grid;
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.trip-card {
+  background: white;
+  border: 1px solid #dededb;
+  border-radius: 16px;
+  padding: 16px 24px 16px 16px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+/* Only "View trip" is actually clickable, but a whole-card lift on
+   hover is a small, honest signal that the row is interactive —
+   common enough that it doesn't overclaim a card-wide click. */
+.trip-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.07);
+  border-color: #cfcfca;
+}
+
+.trip-card-image,
+.trip-card-image-fallback {
+  flex-shrink: 0;
+  width: 84px;
+  height: 84px;
+  border-radius: 12px;
+  object-fit: cover;
+}
+
+.trip-card-image-fallback {
+  background: linear-gradient(135deg, #f6f6f3, #eaeae6);
+}
+
+.trip-card-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.trip-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  /* The 8px gap the destination label used to provide on its own (see
+     the global .section-label rule) — moved up here so wrapping it in
+     this flex row doesn't add an extra, doubled-up gap above the trip
+     name below (a flex item's own margin doesn't collapse through its
+     container the way two plain block siblings' margins would). */
+  margin-bottom: 8px;
+}
+
+.trip-card-meta .section-label {
+  margin-bottom: 0;
+}
+
+/* A small, quiet status pill for a past trip's card — the same
+   uppercase-pill language already used for category pills elsewhere
+   (.place-category, .activity-category, .expense-category), just a
+   touch smaller/quieter to read as secondary information. */
+.trip-card-status {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #8c8c86;
+  background: #f0f0ed;
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+
+/* Recedes slightly at rest so Past Trips reads as quieter than
+   Upcoming without ever looking disabled — full opacity (and the
+   usual hover lift) the moment it's actually interacted with, and
+   every control inside stays fully clickable throughout. */
+.trip-card.is-past {
+  opacity: 0.82;
+}
+
+.trip-card.is-past:hover,
+.trip-card.is-past:focus-within {
+  opacity: 1;
+}
+
+.trip-card h3 {
+  margin: 8px 0;
+  font-size: 24px;
+  letter-spacing: -0.03em;
+}
+
+/* Was `.trip-card p:last-of-type` — implicitly relying on the dates
+   line always being the last <p> in the card. Adding the owner
+   caption below (shared trips only) would have silently broken that
+   the moment it became the new last one, so this is now its own
+   explicit class instead of an implicit position-based selector. */
+.trip-card-dates {
+  color: #707070;
+  font-size: 14px;
+}
+
+/* Shown only on a shared (not owned) trip's card — see TripCard.jsx's
+   own `ownerName` prop. Quieter than the dates line above it, same
+   spirit as .activity-notes/.place-location's own muted-caption
+   treatment elsewhere in the app. */
+.trip-card-owner {
+  margin-top: 2px;
+  color: #8c8c86;
+  font-size: 12px;
+}
+
+@media (max-width: 600px) {
+  .trip-card {
+    flex-wrap: wrap;
+    padding: 14px 16px;
+  }
+
+  .trip-card-image,
+  .trip-card-image-fallback {
+    width: 56px;
+    height: 56px;
+  }
+
+  .trip-card-body {
+    flex-basis: calc(100% - 76px);
+  }
+
+  .trip-card .secondary-button {
+    margin-left: 76px;
+  }
+}
+
+/* ---------- TRIP PAGE ---------- */
+
+.trip-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 48px 40px 80px;
+}
+
+.back-button {
+  border: none;
+  background: none;
+  padding: 0;
+  color: #666;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.back-button:hover {
+  color: #171717;
+}
+
+.trip-header {
+  margin-top: 56px;
+  padding-bottom: 40px;
+  border-bottom: 1px solid #dededb;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.trip-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+/* Export calendar's own quiet outcome line (TripPage.jsx's
+   exportStatus) — `flex-basis: 100%` forces it onto its own fresh line
+   within .trip-header-actions' existing wrap, whatever the current
+   button mix happens to be (a viewer only ever sees Export itself, an
+   owner sees all three) — never squeezed awkwardly next to a button on
+   a wide viewport. Same quiet, no-color-coding treatment as every
+   other understated Settings confirmation/explanation in this app —
+   nothing went wrong either way (a genuine download, or simply nothing
+   to export yet), so this is deliberately not styled as an error. */
+.trip-export-status {
+  flex-basis: 100%;
+  margin: 0;
+  color: #707070;
+  font-size: 13px;
+}
+
+.delete-trip-button {
+  border: none;
+  background: none;
+  padding: 0;
+  color: #b3261e;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.delete-trip-button:hover {
+  color: #7f1d1d;
+}
+
+.trip-header h1 {
+  margin-top: 10px;
+  font-size: clamp(42px, 6vw, 68px);
+  line-height: 1;
+  letter-spacing: -0.055em;
+}
+
+.trip-dates {
+  margin-top: 18px;
+  color: #707070;
+  font-size: 15px;
+}
+
+.itinerary-section {
+  padding-top: 48px;
+}
+
+/* Reuses .friend-list/.friend-item/etc. verbatim (see FRIENDS above)
+   for its rows — genuinely the same "list of people" UI, not just a
+   visually-similar one, so sharing the classes outright is the
+   smaller, more consistent choice here (unlike e.g. the homepage's
+   destination cards, deliberately decoupled from Explore's own for
+   different reasons). Only the section's own spacing is new. */
+.trip-people-section {
+  padding-top: 48px;
+}
+
+/* Owner-only "Pending Invitations" list within People — a lighter
+   break than a full new .trips-section-style heading (this is a
+   sub-list of the same section, not a new page section), reusing
+   .friend-list/.friend-item/.friend-status-pill verbatim for the rows
+   themselves. */
+.trip-people-pending {
+  margin-top: 28px;
+}
+
+.trip-people-pending .friend-list {
+  margin-top: 12px;
+}
+
+.day-card {
+  margin-top: 24px;
+  background: white;
+  border: 1px solid #dededb;
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.day-header {
+  padding: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  border-bottom: 1px solid #e8e8e5;
+}
+
+.day-number {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: #737373;
+}
+
+.day-header h3 {
+  margin-top: 6px;
+  font-size: 22px;
+  letter-spacing: -0.03em;
+}
+
+/* A slim, single-line row rather than a full empty-state block — a day
+   card with no activities shouldn't cost as much vertical space as one
+   with several, especially once a trip has more than a couple of empty
+   days in a row (most visible on mobile). The whole row is a button
+   (same "add an activity for this day" action the day header's own
+   "+ Add activity" uses once the day has activities — see
+   TripPage.jsx, which deliberately hides that header button while a
+   day is still empty, so this row is the one obvious way to fill it
+   in rather than a second identical control next to a passive
+   message). */
+.empty-day {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 24px;
+  border: none;
+  background: transparent;
+  color: #8c8c86;
+  font-size: 14px;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.empty-day:hover {
+  background: #fafaf8;
+}
+
+/* A viewer sees the same row, minus the button affordance — no
+   "+ Add activity" cta (see TripPage.jsx), so it shouldn't look
+   clickable or react to hover either. */
+.empty-day.is-static {
+  cursor: default;
+}
+
+.empty-day.is-static:hover {
+  background: transparent;
+}
+
+.empty-day-cta {
+  flex-shrink: 0;
+  color: #171717;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+@media (max-width: 800px) {
+  .trip-page {
+    padding: 32px 20px 60px;
+  }
+
+  .trip-header {
+    margin-top: 40px;
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .day-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+/* ---------- ACTIVITIES ---------- */
+
+.activity-list {
+  list-style: none;
+  padding: 8px 24px 4px;
+}
+
+.activity-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 0;
+  border-bottom: 1px solid #eeeeec;
+  transition: background-color 0.15s ease;
+}
+
+/* A quiet row tint on hover — same treatment across the three list-row
+   flavors (activities/saved places/expenses) for one consistent feel,
+   reusing the same soft off-white already used by .empty-day:hover and
+   the modal input backgrounds, not a new color. */
+.activity-item:hover,
+.place-item:hover,
+.expense-item:hover {
+  background-color: #fafaf8;
+}
+
+.activity-item:last-child {
+  border-bottom: none;
+}
+
+.activity-details {
+  min-width: 0;
+}
+
+.activity-main {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.activity-time {
+  min-width: 72px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #171717;
+}
+
+.activity-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #171717;
+}
+
+.activity-category {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #737373;
+  background: #f0f0ed;
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+
+.activity-notes {
+  margin-top: 6px;
+  color: #707070;
+  font-size: 13px;
+}
+
+.activity-overlap-warning {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #fdf0e0;
+  color: #9a5b0f;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.activity-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.edit-activity-button {
+  position: relative;
+  border: none;
+  background: none;
+  padding: 4px 8px;
+  color: #737373;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 6px;
+  transition: color 0.15s ease, transform 0.1s ease;
+}
+
+.edit-activity-button:hover {
+  color: #171717;
+}
+
+.edit-activity-button:focus-visible,
+.delete-activity-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(23, 23, 23, 0.18);
+}
+
+.edit-activity-button:active,
+.delete-activity-button:active {
+  transform: scale(0.92);
+}
+
+.delete-activity-button {
+  position: relative;
+  flex-shrink: 0;
+  border: none;
+  background: none;
+  padding: 4px 8px;
+  color: #999;
+  font-size: 18px;
+  border-radius: 6px;
+  transition: color 0.15s ease, transform 0.1s ease;
+  line-height: 1;
+}
+
+.delete-activity-button:hover {
+  color: #c0392b;
+}
+
+/* Both buttons render as plain text/a glyph with no background or
+   border at rest — there's no visible "box" to enlarge, which is
+   exactly why a bigger tap target doesn't have to mean a bigger-
+   looking button. This is a purely invisible hit-area expansion, not
+   a visual change: a taller/wider *clickable* region behind the same
+   compact label, reusable everywhere these two classes already are
+   (activities, saved places, expenses, friends, trip people,
+   notifications, profile — see PROJECT_CONTEXT.md's tap-target-audit
+   entry for the full list and the measurements that motivated the
+   exact numbers below).
+   - Vertical reach (-9px) is safe against every row style these
+     buttons appear in: the tightest is 12px of real padding
+     (.notification-item), so 9px never reaches the row above/below.
+   - Horizontal reach (-4px) is sized to exactly half of these
+     buttons' own container gap (bumped 4px -> 8px alongside this,
+     see .activity-actions/.place-actions/.expense-actions/
+     .friend-actions below) so two adjacent expanded targets (e.g.
+     Edit + Delete, or a role-toggle pill + Remove) meet edge-to-edge
+     rather than overlapping — a tap resolves to exactly one control,
+     never an ambiguous double-hit between a safe and a destructive
+     action. */
+.edit-activity-button::after,
+.delete-activity-button::after {
+  content: '';
+  position: absolute;
+  inset: -9px -4px;
+}
+
+@media (max-width: 600px) {
+  .activity-item {
+    flex-direction: column;
+  }
+
+  .activity-actions {
+    align-self: flex-end;
+  }
+}
+
+/* ---------- CATEGORY SELECT ---------- */
+
+.category-select {
+  position: relative;
+}
+
+.category-select-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 13px 14px;
+  border: 1px solid #d9d9d6;
+  border-radius: 10px;
+  background: #fafaf8;
+  color: #171717;
+  font-size: 15px;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.category-select-trigger:hover {
+  border-color: #c7c7c2;
+}
+
+.category-select-trigger:focus-visible,
+.category-select-trigger[aria-expanded='true'] {
+  outline: none;
+  border-color: #171717;
+  background: white;
+  box-shadow: 0 0 0 3px rgba(23, 23, 23, 0.08);
+}
+
+.category-select-value {
+  color: #171717;
+}
+
+.category-select-placeholder {
+  color: #9a9a95;
+}
+
+.category-select-chevron {
+  color: #8c8c86;
+  font-size: 15px;
+  line-height: 1;
+  transition: transform 0.15s ease;
+}
+
+.category-select-trigger[aria-expanded='true'] .category-select-chevron {
+  transform: rotate(180deg);
+}
+
+.category-select-menu {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 20;
+  max-height: min(240px, 45vh);
+  overflow-y: auto;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  background: white;
+  border: 1px solid #e5e5e2;
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.14);
+}
+
+.category-select-option {
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #171717;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+
+.category-select-option + .category-select-option {
+  margin-top: 2px;
+}
+
+.category-select-option:hover,
+.category-select-option.is-highlighted {
+  background: #f2f2ef;
+}
+
+.category-select-option.is-selected {
+  background: #171717;
+  color: white;
+  font-weight: 600;
+}
+
+.category-select-option.is-selected:hover,
+.category-select-option.is-selected.is-highlighted {
+  background: #171717;
+}
+
+/* ---------- TIME PICKER ---------- */
+
+.time-picker {
+  position: relative;
+}
+
+.time-picker-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 13px 14px;
+  border: 1px solid #d9d9d6;
+  border-radius: 10px;
+  background: #fafaf8;
+  color: #171717;
+  font-size: 15px;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.time-picker-trigger:hover {
+  border-color: #c7c7c2;
+}
+
+.time-picker-trigger:focus-visible,
+.time-picker-trigger[aria-expanded='true'] {
+  outline: none;
+  border-color: #171717;
+  background: white;
+  box-shadow: 0 0 0 3px rgba(23, 23, 23, 0.08);
+}
+
+.time-picker-value {
+  color: #171717;
+}
+
+.time-picker-placeholder {
+  color: #9a9a95;
+}
+
+.time-picker-popover {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 6px);
+  z-index: 20;
+  width: min(240px, calc(100vw - 88px));
+  padding: 10px;
+  background: white;
+  border: 1px solid #e5e5e2;
+  border-radius: 14px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.14);
+}
+
+.time-picker-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr 0.8fr;
+  gap: 6px;
+}
+
+.time-picker-column-label {
+  margin: 0 0 4px;
+  padding: 0 2px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #9a9a95;
+  text-align: center;
+}
+
+.time-picker-column {
+  max-height: 176px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.time-picker-option {
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 8px 0;
+  border-radius: 8px;
+  text-align: center;
+  font-size: 14px;
+  font-family: inherit;
+  color: #171717;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+
+.time-picker-option:hover:not(:disabled) {
+  background: #f2f2ef;
+}
+
+.time-picker-option.is-selected {
+  background: #171717;
+  color: white;
+  font-weight: 600;
+}
+
+.time-picker-option.is-default {
+  border: 1px dashed #d9d9d6;
+}
+
+.time-picker-option:disabled {
+  color: #d4d4d0;
+  cursor: not-allowed;
+}
+
+.time-picker-footer {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #ececea;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.time-picker-done {
+  border: none;
+  border-radius: 999px;
+  background: #171717;
+  color: white;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 14px;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+
+.time-picker-done:hover {
+  background: #000;
+}
+
+/* ---------- CONFIRM DIALOG ---------- */
+
+.confirm-dialog {
+  width: min(100%, 400px);
+}
+
+.confirm-dialog h2 {
+  margin: 0 0 12px;
+  font-size: 22px;
+  letter-spacing: -0.03em;
+}
+
+.confirm-dialog-message {
+  margin: 0 0 28px;
+  color: #5c5c58;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.confirm-dialog-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+/* .primary-button's own margin-top (for a standalone form-submit
+   button) has no business here — a non-destructive ConfirmDialog (e.g.
+   "Sign out?") uses .primary-button for its confirm button, and
+   without this it sits visibly lower than Cancel's .secondary-button
+   in the same row. */
+.confirm-dialog-actions .primary-button {
+  margin-top: 0;
+}
+
+.destructive-button {
+  border: 1px solid #b3261e;
+  border-radius: 10px;
+  background: #b3261e;
+  color: white;
+  padding: 13px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.destructive-button:hover {
+  background: #7f1d1d;
+  border-color: #7f1d1d;
+}
+
+.destructive-button:active {
+  transform: scale(0.97);
+}
+
+.destructive-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(179, 38, 30, 0.25);
+}
+
+@media (max-width: 600px) {
+  .confirm-dialog-actions {
+    flex-direction: column-reverse;
+  }
+
+  .confirm-dialog-actions .secondary-button,
+  .confirm-dialog-actions .destructive-button {
+    width: 100%;
+  }
+}
+
+/* ---------- DATE PICKER ---------- */
+
+.date-picker {
+  position: relative;
+}
+
+.date-picker-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 13px 14px;
+  border: 1px solid #d9d9d6;
+  border-radius: 10px;
+  background: #fafaf8;
+  color: #171717;
+  font-size: 15px;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.date-picker-trigger:hover {
+  border-color: #c7c7c2;
+}
+
+.date-picker-trigger:focus-visible,
+.date-picker-trigger[aria-expanded='true'] {
+  outline: none;
+  border-color: #171717;
+  background: white;
+  box-shadow: 0 0 0 3px rgba(23, 23, 23, 0.08);
+}
+
+.date-picker-value {
+  color: #171717;
+}
+
+.date-picker-placeholder {
+  color: #9a9a95;
+}
+
+.date-picker-popover {
+  /* Position (top/bottom, left, width) and max-height are computed in
+     JS from the trigger's position and the viewport size, then applied
+     as inline styles — so the popover always fits on screen, flipping
+     above the field and/or shrinking with its own internal scroll
+     instead of ever being cut off. `position: fixed` anchors it to the
+     viewport rather than any scrolling/overflow-clipped ancestor. */
+  position: fixed;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  padding: 14px;
+  background: white;
+  border: 1px solid #e5e5e2;
+  border-radius: 14px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.14);
+  overflow: hidden;
+}
+
+.date-picker-header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.date-picker-nav {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #171717;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+
+.date-picker-nav:hover {
+  background: #f2f2ef;
+}
+
+.date-picker-month-label {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #171717;
+}
+
+.date-picker-weekdays {
+  flex-shrink: 0;
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  margin-bottom: 4px;
+}
+
+.date-picker-weekday {
+  text-align: center;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #9a9a95;
+}
+
+.date-picker-grid-scroll {
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.date-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.date-picker-day {
+  aspect-ratio: 1;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #171717;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+
+.date-picker-day:hover:not(:disabled) {
+  background: #f2f2ef;
+}
+
+.date-picker-day.is-outside-month {
+  color: #c7c7c2;
+}
+
+.date-picker-day.is-today {
+  border: 1px solid #171717;
+}
+
+.date-picker-day.is-selected {
+  background: #171717;
+  color: white;
+  font-weight: 600;
+}
+
+.date-picker-day:disabled {
+  color: #d4d4d0;
+  cursor: not-allowed;
+}
+
+/* ---------- SAVED PLACES ---------- */
+
+.saved-places-section {
+  padding-top: 48px;
+}
+
+.place-list {
+  margin-top: 24px;
+  background: white;
+  border: 1px solid #dededb;
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+/* ---------- TRIP MAP (Map v1) ----------
+   Sits between the Saved Places heading and its list — only for
+   places that actually have coordinates (see TripMap.jsx). Same card
+   language as .place-list/.empty-state right around it (white,
+   #dededb border, 16px radius) so it reads as one more piece of this
+   section, not a bolted-on widget. `overflow: hidden` keeps Leaflet's
+   own tile layer clipped to the rounded corners and is the one thing
+   standing between a mid-load tile paint and a horizontal-scroll
+   sliver on narrow screens. */
+.trip-map {
+  margin-top: 24px;
+  height: 320px;
+  border: 1px solid #dededb;
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+/* Leaflet's own default control/marker styling is left alone — this
+   only reins in the popup card (font, padding, shadow) to match
+   Voyage's own restrained, no-drop-shadow visual language instead of
+   Leaflet's stock look. */
+.trip-map .leaflet-popup-content-wrapper {
+  border-radius: 10px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+}
+
+.trip-map-popup {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+}
+
+.trip-map-popup strong {
+  color: #171717;
+}
+
+.trip-map-popup-category {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #737373;
+}
+
+/* The "no saved places have coordinates yet" state — deliberately
+   smaller and quieter than .empty-state (no icon, no heading): this
+   is a compact aside inside a section that may already have its own
+   full empty state below it, not a second focal point on the page. */
+.trip-map-empty {
+  margin-top: 24px;
+  padding: 20px 24px;
+  border: 1px solid #dededb;
+  border-radius: 16px;
+  background: #fafaf8;
+  text-align: center;
+}
+
+.trip-map-empty p {
+  color: #707070;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.place-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 24px;
+  border-bottom: 1px solid #eeeeec;
+  transition: background-color 0.15s ease;
+}
+
+.place-item:last-child {
+  border-bottom: none;
+}
+
+.place-item-image,
+.place-item-image-fallback {
+  flex-shrink: 0;
+  width: 56px;
+  height: 56px;
+  border-radius: 10px;
+  object-fit: cover;
+}
+
+.place-item-image-fallback {
+  background: linear-gradient(135deg, #f6f6f3, #eaeae6);
+}
+
+.place-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.place-main {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.place-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #171717;
+}
+
+.place-category {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #737373;
+  background: #f0f0ed;
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+
+.place-location {
+  margin-top: 6px;
+  color: #707070;
+  font-size: 13px;
+}
+
+.place-notes {
+  margin-top: 4px;
+  color: #707070;
+  font-size: 13px;
+}
+
+.place-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 600px) {
+  .place-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .place-actions {
+    align-self: flex-end;
+  }
+
+  .trip-map {
+    height: 220px;
+  }
+}
+
+/* ---------- PACKING ----------
+   Closest visual reference is Saved Places right above it: same list-
+   card language (.place-list's white/#dededb/16px-radius card,
+   .place-item's row padding + border-bottom) rather than a new list
+   style. No image column (packing items have none), so the row is
+   simpler than .place-item, not a variant of it. */
+
+.packing-section {
+  padding-top: 48px;
+}
+
+.packing-list {
+  margin-top: 24px;
+  background: white;
+  border: 1px solid #dededb;
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.packing-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 24px;
+  border-bottom: 1px solid #eeeeec;
+}
+
+.packing-item:last-child {
+  border-bottom: none;
+}
+
+/* The completion toggle — a plain, unstyled button (no background/
+   border of its own) so .packing-item's own row supplies the visual
+   card; only the circular indicator inside it (.save-trip-indicator,
+   reused verbatim from SaveToTripDialog.jsx/AddExpense.jsx — see
+   `.is-completed` below) carries the "checkbox" affordance. Read-only
+   for a viewer (.is-readonly, a plain div in the same place, not a
+   button) gets identical spacing/typography with no interactive
+   affordance at all. */
+.packing-item-toggle {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0;
+  border: none;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.packing-item-toggle.is-readonly {
+  cursor: default;
+}
+
+/* One added state on the existing indicator component — same circle
+   SaveToTripDialog.jsx's save-to-trip rows and AddExpense.jsx's
+   participant picker already use for "selected", reused here for
+   "completed" rather than introducing a second indicator style. */
+.save-trip-indicator.is-completed {
+  background: #171717;
+  border-color: #171717;
+}
+
+.packing-item-name {
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #171717;
+  /* Long item names wrap within the row instead of overflowing it —
+     same concern .place-details' own min-width: 0 above addresses. */
+  overflow-wrap: anywhere;
+}
+
+/* Clearly completed, but never removed or hidden — the item stays in
+   place, just visually deprioritized. */
+.packing-item-name.is-completed {
+  color: #9a9a95;
+  text-decoration: line-through;
+}
+
+/* ---------- CHOOSE DAY DIALOG ---------- */
+
+.choose-day-list {
+  list-style: none;
+  margin: 0 0 24px;
+  padding: 0;
+  max-height: 280px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.choose-day-option {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid #e5e5e2;
+  border-radius: 10px;
+  background: #fafaf8;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.choose-day-option:hover:not(:disabled) {
+  border-color: #c7c7c2;
+  background: white;
+}
+
+.choose-day-option:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.choose-day-number {
+  font-size: 13px;
+  font-weight: 700;
+  color: #171717;
+}
+
+.choose-day-date {
+  font-size: 13px;
+  color: #707070;
+}
+
+/* ---------- BUDGET ---------- */
+
+.budget-section {
+  padding-top: 48px;
+}
+
+.budget-expenses-heading {
+  margin-top: 40px;
+}
+
+.budget-summary {
+  margin-top: 24px;
+  padding: 24px;
+  background: white;
+  border: 1px solid #dededb;
+  border-radius: 16px;
+}
+
+.budget-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.budget-stat-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #9a9a95;
+}
+
+.budget-stat-value {
+  margin-top: 6px;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: #171717;
+}
+
+.budget-stat-value.is-over-budget {
+  color: #b3261e;
+}
+
+.budget-scope-note {
+  margin-top: 14px;
+  font-size: 13px;
+  color: #707070;
+}
+
+.budget-progress-track {
+  margin-top: 20px;
+  height: 8px;
+  border-radius: 999px;
+  background: #f0f0ed;
+  overflow: hidden;
+}
+
+.budget-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: #171717;
+  transition: width 0.2s ease;
+}
+
+.budget-progress-fill.is-over-budget {
+  background: #b3261e;
+}
+
+.budget-overage-warning {
+  margin-top: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #b3261e;
+}
+
+.budget-breakdown {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid #ececea;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.budget-breakdown-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: #171717;
+}
+
+.budget-breakdown-label span:last-child {
+  color: #707070;
+}
+
+.budget-breakdown-track {
+  margin-top: 6px;
+  height: 5px;
+  border-radius: 999px;
+  background: #f0f0ed;
+  overflow: hidden;
+}
+
+.budget-breakdown-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: #b8b8b2;
+}
+
+@media (max-width: 600px) {
+  .budget-stats {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}
+
+/* ---------- EXPENSES ---------- */
+
+.expense-list {
+  margin-top: 24px;
+  background: white;
+  border: 1px solid #dededb;
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.expense-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 24px;
+  border-bottom: 1px solid #eeeeec;
+  transition: background-color 0.15s ease;
+}
+
+.expense-item:last-child {
+  border-bottom: none;
+}
+
+.expense-details {
+  min-width: 0;
+}
+
+.expense-main {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.expense-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #171717;
+}
+
+.expense-category {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #737373;
+  background: #f0f0ed;
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+
+.expense-date {
+  margin-top: 6px;
+  color: #707070;
+  font-size: 13px;
+}
+
+.expense-notes {
+  margin-top: 4px;
+  color: #707070;
+  font-size: 13px;
+}
+
+/* Same restrained uppercase-pill treatment as .expense-category/
+   .friend-status-pill — a status label, not a category, so its own
+   class rather than reusing theirs, but visually identical on
+   purpose. */
+.expense-shared-pill {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #737373;
+  background: #f0f0ed;
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+
+.expense-split-info {
+  margin-top: 4px;
+  color: #707070;
+  font-size: 13px;
+}
+
+.expense-amount-actions {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.expense-amount {
+  font-size: 15px;
+  font-weight: 600;
+  color: #171717;
+  white-space: nowrap;
+}
+
+.expense-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+@media (max-width: 600px) {
+  .expense-item {
+    flex-direction: column;
+  }
+
+  .expense-amount-actions {
+    align-self: stretch;
+    justify-content: space-between;
+  }
+}
+
+/* ---------- SHARED EXPENSES ---------- */
+
+/* Personal/Shared — same filter-pill "pick one" pattern already used
+   for Explore's category filters, not a new toggle component. */
+.expense-type-toggle {
+  display: flex;
+  gap: 8px;
+}
+
+/* Same muted-caption treatment as .expense-split-preview below (own
+   class rather than reusing that one — this sits under the *other*
+   toggle state and means something different, same "visually
+   identical on purpose, not the same concept" precedent as
+   .expense-shared-pill vs .friend-status-pill). */
+.expense-type-hint {
+  margin-top: -8px;
+  color: #707070;
+  font-size: 13px;
+}
+
+.expense-participants-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+}
+
+.expense-participants-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* .save-trip-list/.save-trip-option (see SaveToTripDialog.jsx) are
+   reused as-is for the participant picker below this — only the
+   trailing amount needs its own rule, since that slot is a saved-
+   status label ("Saved"/nothing) in its original context and a live
+   share amount here. */
+.save-trip-option .save-trip-status {
+  font-weight: 600;
+}
+
+.expense-split-preview {
+  margin-top: -8px;
+  color: #707070;
+  font-size: 13px;
+}
+
+/* Same lighter "sub-list of the section above, not a new page
+   section" spacing .trip-people-pending uses for Pending Invitations
+   under People — Balances is a subsection of Group Spending, not a
+   peer of it, so it gets a smaller break (28px) than the 40px a real
+   new section gets, and its own list sits closer to its label (12px)
+   than a top-level section's content does (24px, still used by
+   .budget-summary/.expense-list/.empty-state above). */
+.expense-balances {
+  margin-top: 28px;
+}
+
+.balance-list {
+  margin-top: 12px;
+  background: white;
+  border: 1px solid #dededb;
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.balance-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 20px;
+  border-bottom: 1px solid #eeeeec;
+}
+
+.balance-row:last-child {
+  border-bottom: none;
+}
+
+.balance-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #171717;
+}
+
+.balance-amount {
+  font-size: 14px;
+  font-weight: 600;
+  color: #171717;
+}
+
+.balance-amount.is-positive {
+  color: #171717;
+}
+
+.balance-amount.is-negative {
+  color: #b3261e;
+}
+
+.settlement-list {
+  margin-top: 12px;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.settlement-row {
+  color: #707070;
+  font-size: 13px;
+}
+
+/* ---------- EXPLORE ---------- */
+
+.explore-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 48px 40px 80px;
+}
+
+.explore-header {
+  max-width: 640px;
+}
+
+.explore-header h1 {
+  margin-top: 10px;
+  font-size: clamp(32px, 5vw, 48px);
+  letter-spacing: -0.04em;
+}
+
+.explore-subtitle {
+  margin-top: 12px;
+  color: #707070;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.explore-search {
+  margin-top: 24px;
+  width: 100%;
+  max-width: 420px;
+  padding: 13px 16px;
+  border: 1px solid #d9d9d6;
+  border-radius: 10px;
+  background: #fafaf8;
+  color: #171717;
+  font-size: 15px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s ease, background-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.explore-search:focus {
+  border-color: #171717;
+  background: white;
+  box-shadow: 0 0 0 3px rgba(23, 23, 23, 0.08);
+}
+
+.explore-title-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.explore-change-destination {
+  border: none;
+  background: none;
+  padding: 0;
+  color: #707070;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.explore-change-destination:hover {
+  color: #171717;
+}
+
+.destination-search {
+  position: relative;
+  margin-top: 24px;
+  max-width: 480px;
+}
+
+/* Create/Edit Trip's own destination field (components/
+   TripDestinationField.jsx) — just the anchor for its suggestions
+   dropdown; the <input> itself is a plain form field styled by the
+   existing `.modal input` rule like Trip name and every other
+   CreateTrip field, not by .destination-search-input (that one's
+   Explore's own search-bar look, a different context). Reuses
+   .destination-search-suggestions/-option verbatim for the dropdown
+   itself — genuinely the same "pick a city" list UI. */
+.trip-destination-field {
+  position: relative;
+}
+
+.destination-search-form {
+  display: flex;
+  gap: 10px;
+}
+
+.destination-search-input {
+  flex: 1;
+  min-width: 0;
+  padding: 13px 16px;
+  border: 1px solid #d9d9d6;
+  border-radius: 10px;
+  background: #fafaf8;
+  color: #171717;
+  font-size: 15px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s ease, background-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.destination-search-input:focus {
+  border-color: #171717;
+  background: white;
+  box-shadow: 0 0 0 3px rgba(23, 23, 23, 0.08);
+}
+
+.destination-search-button {
+  flex-shrink: 0;
+  border: 1px solid #171717;
+  border-radius: 10px;
+  background: #171717;
+  color: white;
+  padding: 0 20px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.destination-search-button:hover {
+  background: #2b2b2b;
+}
+
+.destination-search-suggestions {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 30;
+  max-height: 280px;
+  overflow-y: auto;
+  padding: 6px;
+  background: white;
+  border: 1px solid #e5e5e2;
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.14);
+}
+
+.destination-search-option {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  border: none;
+  background: transparent;
+  padding: 10px 12px;
+  border-radius: 8px;
+  text-align: left;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+
+.destination-search-option:hover,
+.destination-search-option.is-highlighted {
+  background: #f2f2ef;
+}
+
+.destination-search-option-primary {
+  font-size: 14px;
+  font-weight: 600;
+  color: #171717;
+}
+
+.destination-search-option-secondary {
+  font-size: 12px;
+  color: #9a9a95;
+}
+
+.destination-search-empty {
+  padding: 10px 12px;
+  color: #9a9a95;
+  font-size: 13px;
+}
+
+.explore-recent-searches {
+  margin-top: 32px;
+}
+
+.explore-recommended {
+  margin-top: 32px;
+}
+
+.explore-trip-shortcuts {
+  margin-top: 40px;
+}
+
+.explore-intro {
+  margin-top: 32px;
+}
+
+/* Wraps onto additional lines rather than relying on horizontal
+   scroll (fixed after a UI audit found real mobile clipping here) —
+   .filter-pill's own `flex-shrink: 0` used to combine with this row's
+   old `overflow-x: auto` to make a working *scroll* container, but
+   with no visible scrollbar on mobile and no edge fade/partial-pill
+   peek, a row with more pills than fit in one viewport-width read as
+   silently clipped rather than "swipe for more" — confirmed live: the
+   remaining pills were technically still reachable by scrolling the
+   row, but nothing on screen suggested they existed. Matches the
+   established precedent already used for the same "row of pills that
+   might not fit" problem elsewhere (.dashboard-friend-chips: `display:
+   flex; flex-wrap: wrap; gap: 8px`) rather than inventing a second
+   pattern. `overflow-x: auto` stays as a defensive fallback only — it
+   only engages if a single pill is ever wider than its own line (a
+   long city name on a narrow screen), which flex-wrap alone can't
+   solve since .filter-pill deliberately never shrinks or truncates. */
+.filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 24px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.filter-pill {
+  flex-shrink: 0;
+  border: 1px solid #d9d9d6;
+  border-radius: 999px;
+  background: white;
+  color: #171717;
+  padding: 9px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.15s ease, background-color 0.15s ease,
+    color 0.15s ease, transform 0.1s ease;
+}
+
+.filter-pill:hover {
+  border-color: #bcbcb8;
+}
+
+.filter-pill:active {
+  transform: scale(0.96);
+}
+
+.filter-pill:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(23, 23, 23, 0.18);
+}
+
+.filter-pill.is-active {
+  background: #171717;
+  border-color: #171717;
+  color: white;
+}
+
+.place-grid {
+  margin-top: 32px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 20px;
+}
+
+.place-explore-card {
+  display: flex;
+  flex-direction: column;
+  background: white;
+  border: 1px solid #dededb;
+  border-radius: 16px;
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.place-explore-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.07);
+  border-color: #cfcfca;
+}
+
+.place-explore-image-wrap {
+  position: relative;
+  background: #f0f0ed;
+}
+
+.place-explore-image {
+  display: block;
+  width: 100%;
+  height: 160px;
+  object-fit: cover;
+  background: #f0f0ed;
+  opacity: 0;
+  transition: opacity 0.25s ease, transform 0.3s ease;
+}
+
+.place-explore-image.is-loaded {
+  opacity: 1;
+}
+
+/* A gentle zoom on the card's own hover (not the image's) — the
+   card's overflow: hidden above keeps it cleanly clipped. */
+.place-explore-card:hover .place-explore-image.is-loaded {
+  transform: scale(1.04);
+}
+
+.place-explore-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 18px;
+}
+
+.place-explore-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.place-explore-heading h3 {
+  font-size: 17px;
+  letter-spacing: -0.02em;
+}
+
+.place-explore-category {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #737373;
+  background: #f0f0ed;
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+
+.place-explore-destination {
+  font-size: 13px;
+  color: #9a9a95;
+}
+
+.place-explore-description {
+  flex: 1;
+  margin-top: 2px;
+  color: #5c5c58;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.place-explore-actions {
+  margin-top: 12px;
+  display: flex;
+  gap: 10px;
+}
+
+.place-explore-actions .secondary-button,
+.place-explore-actions .primary-button {
+  flex: 1;
+  margin-top: 0;
+  padding: 10px 16px;
+  text-align: center;
+}
+
+@media (max-width: 600px) {
+  .explore-page {
+    padding: 32px 20px 60px;
+  }
+
+  .place-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------- PLACE DETAILS ---------- */
+
+.place-details-image-wrap {
+  position: relative;
+  margin-bottom: 20px;
+  background: #f0f0ed;
+  border-radius: 12px;
+}
+
+.place-details-image {
+  display: block;
+  width: 100%;
+  height: 260px;
+  border-radius: 12px;
+  object-fit: cover;
+  background: #f0f0ed;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+.place-details-image.is-loaded {
+  opacity: 1;
+}
+
+/* Quiet caption over a city/category-level fallback photo — never
+   shown on a genuinely place-specific photo — so a destination photo
+   is never mistaken for a picture of the specific business itself. */
+.place-image-source-badge {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(23, 23, 23, 0.55);
+  color: white;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  backdrop-filter: blur(2px);
+}
+
+.place-details-destination {
+  margin-top: -8px;
+  margin-bottom: 12px;
+  color: #9a9a95;
+  font-size: 14px;
+}
+
+.place-details-description {
+  color: #5c5c58;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.place-details-address {
+  margin-top: 12px;
+  color: #707070;
+  font-size: 13px;
+}
+
+/* ---------- SAVE STATUS ---------- */
+
+.save-status-button {
+  border: 1px solid #171717;
+  border-radius: 10px;
+  background: white;
+  color: #171717;
+  padding: 13px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease, transform 0.1s ease;
+}
+
+.save-status-button:hover {
+  background: #f2f2ef;
+}
+
+.save-status-button:active {
+  transform: scale(0.97);
+}
+
+.save-status-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(23, 23, 23, 0.18);
+}
+
+/* The one-time confirmation "pop" the moment a place is saved — plays
+   automatically since this class only appears on the button once it's
+   actually saved (see PlaceCard.jsx/PlaceDetails.jsx), never repeats
+   on its own afterward. */
+.save-status-button.is-saved {
+  animation: save-confirm-pop 0.3s ease;
+}
+
+.place-explore-actions .save-status-button {
+  flex: 1;
+  margin-top: 0;
+  padding: 10px 16px;
+  text-align: center;
+}
+
+.save-trip-list {
+  list-style: none;
+  margin: 0 0 24px;
+  padding: 0;
+  max-height: 280px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.save-trip-option {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid #e5e5e2;
+  border-radius: 10px;
+  background: #fafaf8;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.save-trip-option:hover {
+  border-color: #c7c7c2;
+  background: white;
+}
+
+.save-trip-option.is-saved {
+  border-color: #171717;
+  background: white;
+}
+
+.save-trip-indicator {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid #d9d9d6;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  color: white;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.save-trip-option.is-saved .save-trip-indicator {
+  background: #171717;
+  border-color: #171717;
+}
+
+.save-trip-name {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 600;
+  color: #171717;
+}
+
+.save-trip-status {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: #9a9a95;
+}
+
+.save-trip-option.is-saved .save-trip-status {
+  color: #171717;
+  font-weight: 600;
+}
+
+/* Shown instead of <img> when a place has no photo — no matching Pexels
+   result, the lookup failed, or an image URL didn't load. Same height
+   as a real photo in the same context (below) so the grid/modal layout
+   never shifts depending on whether a place has an image — a compact,
+   intentional neutral accent instead of an empty void. */
+.place-explore-image-fallback,
+.place-details-image-fallback {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #f6f6f3, #eaeae6);
+}
+
+.place-explore-image-fallback {
+  height: 160px;
+  border-bottom: 1px solid #eaeae6;
+}
+
+.place-details-image-fallback {
+  height: 260px;
+  border-radius: 12px;
+  margin-bottom: 20px;
+}
+
+.place-image-fallback-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #b8b8b2;
+}
+
+.place-explore-image-fallback.is-loading,
+.place-details-image-fallback.is-loading {
+  animation: place-image-fallback-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes place-image-fallback-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+/* Small, unobtrusive Pexels attribution below the place grid — Pexels'
+   own terms require credit for photos sourced from it, but this must
+   never read as if Pexels were the source of the place data itself. */
+.pexels-attribution {
+  margin-top: 20px;
+  text-align: center;
+  font-size: 12px;
+  color: #b0b0aa;
+}
+
+.pexels-attribution a {
+  color: #8a8a84;
+}
+
+/* ---------- FRIENDS ---------- */
+
+.friends-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 48px 40px 80px;
+}
+
+.friends-header {
+  max-width: 640px;
+}
+
+.friends-header h1 {
+  margin-top: 10px;
+  font-size: clamp(32px, 5vw, 48px);
+  letter-spacing: -0.04em;
+}
+
+.friends-action-error {
+  margin: 24px 0 0;
+}
+
+.friends-search-section {
+  padding-top: 32px;
+}
+
+.friends-search-section .explore-search {
+  margin-bottom: 24px;
+}
+
+.friends-list-section {
+  padding-top: 48px;
+}
+
+.friend-list {
+  margin-top: 24px;
+  background: white;
+  border: 1px solid #dededb;
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.friend-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 24px;
+  border-bottom: 1px solid #eeeeec;
+  transition: background-color 0.15s ease;
+}
+
+.friend-item:last-child {
+  border-bottom: none;
+}
+
+.friend-item:hover {
+  background-color: #fafaf8;
+}
+
+.friend-identity {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+/* Same circular-initials treatment as the navbar's own profile-button
+   (see utils/profile.js's shared getInitials), just not a button here
+   — there's no Profile/Account page yet for this to open. */
+.friend-avatar {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #171717;
+  color: white;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.friend-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #171717;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.friend-status-pill {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #737373;
+  background: #f0f0ed;
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+
+.friend-actions {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* The Editor/Viewer role choice — in AddTripFriends.jsx (before adding
+   a friend) and TripPeopleSection.jsx (changing an existing
+   collaborator's role). Deliberately the same visual language as
+   .friend-status-pill's resting state (same size/shape/colors) so an
+   inactive role reads as "just a label" and the active one reads as
+   "chosen", the same relationship .filter-pill/.filter-pill.is-active
+   already establishes elsewhere — not a new pill style. */
+.role-toggle {
+  flex-shrink: 0;
+  display: flex;
+  gap: 4px;
+}
+
+.role-pill {
+  flex-shrink: 0;
+  border: none;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #737373;
+  background: #f0f0ed;
+  padding: 4px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.role-pill:hover:not(:disabled) {
+  background: #e2e2de;
+}
+
+.role-pill.is-active {
+  background: #171717;
+  color: white;
+}
+
+.role-pill:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+@media (max-width: 600px) {
+  .friends-page {
+    padding: 32px 20px 60px;
+  }
+
+  .friend-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  /* .friend-item switching to a column stack above means its cross-axis
+     (horizontal) sizing is no longer driven by the row's own
+     `justify-content: space-between` — `align-items: flex-start` makes
+     every child shrink-to-fit instead of filling the row's width. Every
+     other child already has an explicit `align-self` override (below);
+     .friend-identity was the one left at that shrink-to-fit default,
+     which let a long display name grow the row as wide as the
+     unwrapped text needed (`.friend-name` is deliberately
+     `white-space: nowrap` + `text-overflow: ellipsis`, but ellipsis
+     only ever engages once something actually constrains the box it's
+     in) — invisible on desktop where the row's own width already does
+     that job, but on mobile the name just silently ran past the card's
+     rounded edge (clipped by .friend-list's own `overflow: hidden`,
+     confirmed live, no horizontal page scroll caused by it either,
+     which is exactly why it went unnoticed). `align-self: stretch`
+     gives it the row's actual width back, so `.friend-name`'s own
+     min-width: 0 parent and existing ellipsis rule finally have a real
+     boundary to truncate against. */
+  .friend-identity {
+    align-self: stretch;
+  }
+
+  .friend-actions,
+  .friend-status-pill,
+  .role-toggle {
+    align-self: flex-end;
+  }
+}
+
+/* ---------- PROFILE ---------- */
+
+/* Narrower and centered — a compact single-column account page, not
+   another wide dashboard-style list view like Trips/Explore/Friends. */
+.profile-page {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 48px 40px 80px;
+}
+
+.profile-header {
+  padding-bottom: 32px;
+  border-bottom: 1px solid #dededb;
+}
+
+.profile-header-identity {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+/* The name/email column next to the avatar. A flex item's default
+   min-width is `auto`, not 0 — it refuses to shrink narrower than its
+   own unbroken content, which is exactly what let a long email push
+   this row (and the page) wider than the viewport at narrow widths
+   instead of wrapping. `min-width: 0` is what actually lets it shrink
+   to the row's real available width; .profile-header-email's own
+   overflow-wrap below is what then lets the email wrap inside that
+   width instead of overflowing it. */
+.profile-header-text {
+  min-width: 0;
+}
+
+/* Edit profile modal's own avatar + Change/Remove photo row — see
+   components/EditProfile.jsx. Sits above the display-name field inside
+   the same form/modal, not a separate page-level control. */
+.edit-profile-avatar-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.profile-avatar-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+/* Plain text-link buttons, not .secondary-button/.destructive-button —
+   deliberately quieter than those, since this sits directly under the
+   avatar rather than in the Account Actions row. */
+.profile-avatar-link {
+  border: none;
+  background: none;
+  padding: 0;
+  color: #5f5f5f;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.profile-avatar-link:hover {
+  color: #171717;
+}
+
+.profile-avatar-link.is-destructive {
+  color: #b3261e;
+}
+
+.profile-avatar-link.is-destructive:hover {
+  color: #7f1d1d;
+}
+
+.profile-avatar-link:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(23, 23, 23, 0.18);
+  border-radius: 4px;
+}
+
+.profile-avatar-input {
+  display: none;
+}
+
+.profile-header-avatar {
+  flex-shrink: 0;
+  width: 64px;
+  height: 64px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #171717;
+  color: white;
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.profile-header h1 {
+  font-size: clamp(24px, 4vw, 32px);
+  letter-spacing: -0.03em;
+}
+
+.profile-header-email {
+  margin-top: 4px;
+  color: #707070;
+  font-size: 14px;
+  /* An email has no spaces for normal wrapping to break on — without
+     this, a long one just runs past its own box's edge instead of
+     wrapping (this is what .profile-header-text's min-width: 0 above
+     is for: giving this something narrower than the raw text to
+     actually wrap against). Wraps onto a second line rather than
+     truncating with an ellipsis — this is the account's own email
+     address, worth keeping fully visible/readable over shortening it. */
+  overflow-wrap: anywhere;
+}
+
+.profile-info-section,
+.profile-friends-section,
+.profile-actions-section {
+  padding-top: 40px;
+}
+
+.profile-info-card {
+  margin-top: 24px;
+  background: white;
+  border: 1px solid #dededb;
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.profile-info-row {
+  padding: 16px 24px;
+  border-bottom: 1px solid #eeeeec;
+}
+
+.profile-info-row:last-child {
+  border-bottom: none;
+}
+
+.profile-info-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #737373;
+}
+
+.profile-info-value {
+  margin-top: 6px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #171717;
+  /* Same reasoning as .profile-header-email above — this is also where
+     a long email renders (ProfilePage.jsx/SettingsPage.jsx's own EMAIL
+     row). .profile-info-row/.profile-info-card are plain block
+     containers (not flex), so no min-width fix is needed here, just
+     the ability to actually wrap an unbroken string instead of
+     spilling past the card's edge, where .profile-info-card's own
+     `overflow: hidden` was silently clipping it with no ellipsis. */
+  overflow-wrap: anywhere;
+}
+
+/* Display Name's row alone gets a visible Edit affordance beside its
+   value (reusing .edit-activity-button, the same "Edit" button used
+   throughout Voyage for activities/expenses/places — not a new button
+   style) — the clearest, most minimal way to signal "this one's
+   editable" without turning the name text itself into a link. */
+.profile-info-value-row {
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.profile-info-value-row .profile-info-value {
+  margin-top: 0;
+}
+
+/* Settings' Default currency row (SettingsPage.jsx) — the exact same
+   label-then-value spacing as every other .profile-info-row above
+   (.profile-info-value's own 6px), just applied to a CategorySelect
+   instead of a plain value, and its own error/success line pulled in
+   tight beneath it the same way .form-error already sits under any
+   other field. */
+.profile-info-row .category-select {
+  margin-top: 6px;
+}
+
+.profile-info-row .form-error {
+  margin-top: 10px;
+}
+
+.profile-info-row .confirm-dialog-message {
+  margin: 10px 0 0;
+}
+
+/* Same tappable-row language as .choose-day-option — a quiet, bordered
+   row rather than a plain text link, since this is the one place
+   Profile hands off to a whole other page. */
+.profile-friends-link {
+  margin-top: 24px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 20px;
+  border: 1px solid #e5e5e2;
+  border-radius: 12px;
+  background: #fafaf8;
+  color: #171717;
+  font-size: 15px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease,
+    transform 0.1s ease;
+}
+
+.profile-friends-link:hover {
+  border-color: #c7c7c2;
+  background: white;
+}
+
+.profile-friends-link:active {
+  transform: scale(0.99);
+}
+
+.profile-friends-link:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(23, 23, 23, 0.18);
+}
+
+.profile-actions {
+  margin-top: 24px;
+  display: flex;
+  gap: 12px;
+}
+
+.profile-actions .primary-button,
+.profile-actions .secondary-button {
+  margin-top: 0;
+}
+
+@media (max-width: 600px) {
+  .profile-page {
+    padding: 32px 20px 60px;
+  }
+
+  .profile-actions {
+    flex-direction: column;
+  }
+}
+
+/* Delete account — kept visually separate from the ordinary Account
+   Actions above (its own bordered card with a quiet red-tinted border,
+   not just another button in the same row) so it never reads as just
+   another routine action, and its confirm button uses the existing
+   .destructive-button style, not a new one. */
+.profile-danger-section {
+  padding-top: 40px;
+}
+
+.profile-danger-card {
+  margin-top: 24px;
+  padding: 20px 24px;
+  border: 1px solid #f0d5d3;
+  border-radius: 16px;
+  background: #fdf6f6;
+}
+
+.profile-danger-card p {
+  margin: 0 0 16px;
+  color: #5c5c58;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.profile-danger-card .destructive-button {
+  margin-top: 0;
+}
+
+/* Matches .profile-actions's own mobile rule above (Edit profile/Sign
+   out already go full-width via flex-direction: column there) — Delete
+   account sits in its own card, outside that flex row, so it never
+   picked up the same treatment: on a narrow screen it was rendering as
+   a small, left-aligned button floating in an otherwise full-width red
+   card, the one visibly awkward exception on a page where every other
+   primary action was already a comfortable, full-width mobile tap
+   target — and the one action that least deserves a *smaller* target
+   than the routine ones above it. */
+@media (max-width: 600px) {
+  .profile-danger-card .destructive-button {
+    width: 100%;
+  }
+}
+
+/* ---------- RESET PASSWORD ---------- */
+
+/* A standalone page (reached only from the link in a password-reset
+   email — see ResetPasswordPage.jsx's own comment), not a modal over
+   existing content, but it reuses .modal's own card/header/form/input
+   styling verbatim rather than inventing a second look for what's
+   still the exact same kind of "one focused form" surface AuthDialog
+   already established. Only two new rules: the same centered-column
+   page shape every other Voyage page already uses (.profile-page's own
+   numbers), and one override so .modal's own margin — tuned for
+   centering *inside* a fixed, full-viewport overlay (see .modal's own
+   comment) — centers correctly in normal page flow instead. */
+.reset-password-page {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 48px 40px 80px;
+}
+
+.reset-password-page .modal {
+  margin: 0 auto;
+}
+
+@media (max-width: 600px) {
+  .reset-password-page {
+    padding: 32px 20px 60px;
+  }
+}
+
+/* ---------- DASHBOARD: FRIENDS SUMMARY ---------- */
+
+/* A shorter, quieter empty-state than the full-page ones (.empty-
+   state's own 300px min-height reads right for "No trips yet" filling
+   the page, but would make a compact dashboard section anything but
+   compact) — everything else (centering, icon-less here, h3/p
+   spacing) still comes from the base .empty-state rule. */
+.dashboard-friends-section .empty-state,
+.dashboard-activity-empty {
+  min-height: 0;
+  padding: 32px 24px;
+}
+
+.dashboard-friends-row {
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.dashboard-friend-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* A tappable "avatar + name" pill — same underlying idea as
+   .friend-item's own identity row, just compact and clickable as one
+   unit (always navigates to /friends; there's no accept/decline/
+   remove affordance on the dashboard). */
+.dashboard-friend-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  background: none;
+  padding: 4px 12px 4px 4px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: #171717;
+  transition: background-color 0.15s ease;
+}
+
+.dashboard-friend-chip:hover {
+  background: #f2f2ef;
+}
+
+.dashboard-friend-chip:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(23, 23, 23, 0.18);
+}
+
+.dashboard-friend-chip-overflow {
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #8c8c86;
+  padding: 4px 10px;
+}
+
+/* ---------- DASHBOARD: RECENT ACTIVITY ---------- */
+
+.activity-feed-list {
+  margin-top: 20px;
+  list-style: none;
+}
+
+.activity-feed-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 0;
+  border-bottom: 1px solid #eeeeec;
+}
+
+.activity-feed-row:last-child {
+  border-bottom: none;
+}
+
+.activity-feed-text {
+  color: #171717;
+  font-size: 14px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.activity-feed-time {
+  flex-shrink: 0;
+  color: #8c8c86;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+@media (max-width: 600px) {
+  .activity-feed-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+
+  .activity-feed-time {
+    white-space: normal;
+  }
+}
+
+/* ---------- PRINT ITINERARY ---------- */
+
+/* Trip Detail's own "Print itinerary" button (TripPage.jsx) just calls
+   the browser's native `window.print()` — everything about what
+   actually ends up on paper (or a "Save as PDF" destination, which
+   every mainstream browser already offers from the same dialog, no PDF
+   library needed) is decided here. Deliberately reuses the exact same
+   DOM the screen already renders rather than a second, print-only copy
+   of the itinerary — every rule below either hides an element that has
+   no place on paper (the navbar's own nav links/account controls, every
+   action button, People/Saved Places/My Budget/Group Spending) or
+   restyles something that's staying (the day cards, the activity rows)
+   away from its screen "card on a grey page" look toward a plain
+   document look, since a printed page has no grey background to
+   contrast against and a filled/bordered box only spends ink for no
+   reason once that contrast is gone.
+   "Voyage" itself is NOT duplicated as new markup anywhere for this —
+   .navbar stays in the DOM but everything inside it except the existing
+   .logo text is hidden, so the one existing "Voyage" node becomes the
+   printed document's own quiet header for free. */
+@media print {
+  /* Never print an open dialog over the itinerary — a modal left open
+     while printing via Ctrl+P (bypassing the Print itinerary button,
+     which is itself hidden below anyway) would otherwise capture
+     exactly the kind of "screenshot of the website" look this feature
+     is meant to avoid. Global, not trip-page-scoped: no modal anywhere
+     in Voyage belongs on a printed page. */
+  .modal-overlay {
+    display: none !important;
+  }
+
+  body {
+    background: white;
+  }
+
+  .nav-links,
+  .nav-account {
+    display: none !important;
+  }
+
+  .navbar {
+    height: auto;
+    padding: 0 0 10px;
+    margin-bottom: 24px;
+    border-bottom: 1px solid #ccc;
+  }
+
+  .logo {
+    font-size: 18px;
+  }
+
+  /* Everything on Trip Detail that only makes sense as an interactive
+     screen control, or belongs to a section this feature deliberately
+     excludes (People, Saved Places, My Budget, Group Spending — see
+     this feature's own scope: only the itinerary itself prints). */
+  .trip-page .back-button,
+  .trip-page .filter-row,
+  .trip-page .trip-header-actions,
+  .trip-page #trip-section-people,
+  .trip-page #trip-section-places,
+  .trip-page .budget-section {
+    display: none !important;
+  }
+
+  .trip-page {
+    max-width: none;
+    padding: 0;
+  }
+
+  .trip-header {
+    margin-top: 0;
+    padding-bottom: 16px;
+    align-items: flex-start;
+  }
+
+  .trip-header h1 {
+    font-size: 26px;
+  }
+
+  /* A day is a document section now, not a screen "card" — no fill/
+     border/radius (there's no grey page behind it to stand out from
+     any more), just a plain rule between one day and the next. The
+     day's own heading is kept from ever landing alone at the bottom of
+     a page (`break-after: avoid`) — it must stay with at least
+     whatever comes right after it, activity or empty-state message —
+     while the day's full body is deliberately left free to break
+     across a page (no `break-inside: avoid` on the day itself): a day
+     with many activities should flow normally, not get shoved onto a
+     fresh page as one all-or-nothing block, which is exactly the "large
+     unnecessary blank area" this task asks to avoid. Individual
+     activities are the real atomic unit instead (below). */
+  .trip-page .day-card {
+    background: none;
+    border: none;
+    border-radius: 0;
+    overflow: visible;
+    border-top: 1px solid #ccc;
+    margin-top: 20px;
+    padding-top: 14px;
+  }
+
+  .trip-page .day-card:first-child {
+    border-top: none;
+    margin-top: 0;
+    padding-top: 0;
+  }
+
+  .trip-page .day-header {
+    padding: 0 0 8px;
+    border-bottom: none;
+    break-after: avoid;
+    page-break-after: avoid;
+    /* `break-after` alone only stops a break *right after* this
+       element — it does nothing to stop one *inside* it. Confirmed
+       live: without this, the day-header's own two children (the "DAY
+       N" label and its actual date heading) could land on opposite
+       sides of a page break, exactly the "orphaned day heading" this
+       task asks to avoid, just one level more literal than expected. */
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* The day-header's own "+ Add activity" button (only ever rendered
+     once that day already has activities — see TripPage.jsx) — the
+     date heading itself stays. */
+  .trip-page .day-header .secondary-button {
+    display: none !important;
+  }
+
+  .trip-page .activity-list {
+    padding: 0;
+  }
+
+  /* Each activity is the unit page-break protection is actually scoped
+     to — never split one activity's own time/name/category/notes
+     across two pages. */
+  .trip-page .activity-item {
+    padding: 10px 0;
+    border-bottom: 1px solid #e5e5e5;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .trip-page .activity-item:last-child {
+    border-bottom: none;
+  }
+
+  .trip-page .activity-actions,
+  .trip-page .activity-overlap-warning {
+    display: none !important;
+  }
+
+  /* Explicitly neutralizes the screen-only :hover tint (.activity-item/
+     .empty-day's own `background-color: #fafaf8` on hover) rather than
+     just relying on print not having a real pointer — confirmed live
+     (Chromium's own print/PDF rendering, not just this project's dev
+     tools) that a page rendered for print still honors whatever
+     position its virtual cursor was last at, so a stray highlight could
+     land on an arbitrary, unrelated row purely because the print
+     layout reflows content to a different position than the screen
+     had. A printed document should never carry a screen-only "pointer
+     is here" cue at all, regardless of where the cursor happened to be
+     the moment printing was triggered. */
+  .trip-page .activity-item:hover,
+  .trip-page .empty-day:hover {
+    background-color: transparent !important;
+    background: none !important;
+  }
+
+  /* A day with no activities still prints its own real message ("No
+     activities planned yet.") — this is `.empty-day`'s existing static/
+     viewer copy already used on screen (see TripPage.jsx), just with
+     its button affordance and "+ Add activity" call-to-action stripped
+     back to plain text for paper. */
+  .trip-page .empty-day {
+    padding: 4px 0;
+    color: #707070;
+    cursor: default;
+  }
+
+  .trip-page .empty-day-cta {
+    display: none;
+  }
+}
