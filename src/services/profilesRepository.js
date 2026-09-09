@@ -6,6 +6,36 @@
 // 0001_init.sql already created and Friends already reads from.
 import { supabase } from './supabase'
 
+// A best-effort pre-check only — used by AuthDialog.jsx to show a
+// fast, friendly "Username is already taken." before ever attempting
+// signup. This is NOT the actual authority on uniqueness: two people
+// submitting the same username at nearly the same instant could both
+// see `true` here. The real, final authority is the unique index on
+// `profiles.username` (see supabase/migrations/0018_profile_
+// usernames.sql), enforced inside the same transaction as the
+// signup's own `auth.users` insert — useAuth.js's signUp() handles
+// that race outcome separately. `username` must already be the
+// normalized (trimmed + lowercased) form — see utils/profile.js's
+// normalizeUsername; this function does no normalization of its own,
+// same "caller passes an already-shaped value" convention every other
+// repository function in this file already follows.
+//
+// Goes through a narrow RPC, not a plain `select` on `profiles` —
+// this runs while the caller is still signed out (mid-signup, no
+// session yet), and `profiles`' own read policy is scoped to
+// `authenticated` only; a direct select here would just 401.
+// is_username_available() (same migration) is a `security definer`
+// function granted to `anon` that answers only this one yes/no
+// question, never exposing any actual profile data to a signed-out
+// caller.
+export async function isUsernameAvailable(username) {
+  const { data, error } = await supabase.rpc('is_username_available', {
+    check_username: username,
+  })
+  if (error) throw error
+  return data
+}
+
 // Updates the signed-in user's display name in *both* places it lives:
 //   1. The `profiles` row itself — the record services/
 //      friendsRepository.js's searchUsers/embedded-profile queries

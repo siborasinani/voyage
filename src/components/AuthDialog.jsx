@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { isUsernameAvailable } from '../services/profilesRepository'
+import { getUsernameError, normalizeUsername } from '../utils/profile'
 
 // Sign in / sign up / password recovery modal — one form, one mode
 // switch, following the same modal/form conventions as CreateTrip.jsx
@@ -59,6 +61,7 @@ function AuthDialog({
     const formData = new FormData(event.target)
     const firstName = (formData.get('firstName') || '').trim()
     const lastName = (formData.get('lastName') || '').trim()
+    const username = normalizeUsername(formData.get('username'))
     const email = formData.get('email')
     const password = formData.get('password')
 
@@ -72,6 +75,14 @@ function AuthDialog({
       return
     }
 
+    if (isSignUp) {
+      const usernameError = getUsernameError(username)
+      if (usernameError) {
+        setFieldError(usernameError)
+        return
+      }
+    }
+
     if (!email) {
       setFieldError('Enter your email.')
       return
@@ -83,9 +94,35 @@ function AuthDialog({
     }
 
     setFieldError('')
+
+    // A best-effort pre-check only, ahead of ever attempting signup —
+    // see profilesRepository.js's own comment on why the real
+    // authority is the database's unique index, not this. Skipped
+    // entirely if it fails to load (a network hiccup) rather than
+    // blocking signup on a check that isn't the actual authority
+    // anyway — the unique index still catches a genuine duplicate
+    // either way, just without this early, friendlier message.
+    if (isSignUp) {
+      setIsSubmitting(true)
+      try {
+        const available = await isUsernameAvailable(username)
+        if (!available) {
+          setIsSubmitting(false)
+          setFieldError('Username is already taken.')
+          return
+        }
+      } catch {
+        // Fall through to the real signup attempt below.
+      }
+      setIsSubmitting(false)
+    }
+
     setIsSubmitting(true)
     const result = isSignUp
-      ? await onSignUp(email, password, { display_name: `${firstName} ${lastName}` })
+      ? await onSignUp(email, password, {
+          display_name: `${firstName} ${lastName}`,
+          username,
+        })
       : await onSignIn(email, password)
     setIsSubmitting(false)
 
@@ -215,6 +252,19 @@ function AuthDialog({
                   <input name="lastName" type="text" placeholder="Lovelace" required />
                 </label>
               </div>
+            )}
+
+            {isSignUp && (
+              <label>
+                Username
+                <input
+                  name="username"
+                  type="text"
+                  placeholder="adalovelace"
+                  autoComplete="off"
+                  required
+                />
+              </label>
             )}
 
             <label>

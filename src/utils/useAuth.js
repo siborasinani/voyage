@@ -1,6 +1,33 @@
 import { useEffect, useState } from 'react'
 import { isSupabaseConfigured, supabase } from '../services/supabase'
 
+// Recognizes the rare-race outcome of a duplicate username slipping
+// past AuthDialog.jsx's own pre-check (see signUp below).
+//
+// Confirmed live against the real project, not guessed: a direct
+// fetch to Supabase's own /auth/v1/signup endpoint surfaces the raw
+// Postgres error for this ("duplicate key value violates unique
+// constraint \"profiles_username_idx\""), but supabase-js's client
+// normalizes *any* 500 from that endpoint into one generic
+// `AuthRetryableFetchError` with the message "Database error saving
+// new user" — the specific Postgres detail never reaches the browser
+// at all. That generic message is still a reliable signal today,
+// though: handle_new_user() (0018_profile_usernames.sql) has exactly
+// one way to fail — the username unique index — since its only other
+// constraint (`id`, the primary key) is already handled by its own
+// `on conflict (id) do nothing`. If handle_new_user() ever gains a
+// second real failure mode, this would need to stop assuming "any
+// generic database error at signup = a username conflict" — it isn't
+// one going forward on its own, only true given today's trigger.
+function isLikelyUsernameConflict(error) {
+  const message = (error?.message || '').toLowerCase()
+  return (
+    message.includes('database error saving new user') ||
+    message.includes('profiles_username') ||
+    (message.includes('username') && (message.includes('taken') || message.includes('unique') || message.includes('duplicate')))
+  )
+}
+
 // This hook is the one place App.jsx reads/drives auth state from,
 // matching the app's existing "all state in App.jsx, passed down via
 // props" convention (no Context provider introduced for this).
@@ -73,11 +100,16 @@ export function useAuth() {
   // means there's no session yet", and `data.session` is the only
   // reliable way to know which actually happened (a truthy result from
   // signUp() alone doesn't say either way).
-  const runAuthAction = async (action) => {
+  // `transformError` (optional) lets one specific caller — signUp
+  // below — turn a known, specific failure into a friendlier message
+  // than whatever Supabase's own error text says; every other caller
+  // omits it and keeps today's exact behavior (the raw
+  // `error.message`, unchanged).
+  const runAuthAction = async (action, transformError) => {
     setAuthError(null)
     const { data, error } = await action()
     if (error) {
-      setAuthError(error.message)
+      setAuthError(transformError ? transformError(error) : error.message)
       return { success: false }
     }
     return { success: true, data }
@@ -96,8 +128,27 @@ export function useAuth() {
     // `handle_new_user()` (see 0001_init.sql) reads it back out when it
     // creates the matching `profiles` row, so no separate profile-write
     // call is needed here.
+    // `metadata` now also carries `username` (already normalized —
+    // see AuthDialog.jsx) alongside `display_name` — handle_new_user()
+    // (0018_profile_usernames.sql) reads it into `profiles.username`
+    // the same way it already reads `display_name`. AuthDialog.jsx's
+    // own pre-check (profilesRepository.js's isUsernameAvailable)
+    // catches the common "already taken" case before this is ever
+    // called, but that check isn't the real authority — two people
+    // submitting the same username at nearly the same instant could
+    // both pass it. The unique index is: the losing signup's insert
+    // into `profiles` fails inside handle_new_user()'s own trigger,
+    // which rolls back that `auth.users` row too (no orphaned account
+    // ever exists without a matching profile) and surfaces here as a
+    // genuine `error` from signUp() itself — `isLikelyUsernameConflict`
+    // recognizes that specific case so this rare race still gets the
+    // same clean "already taken" message the common case does, rather
+    // than a raw/generic database error.
     signUp: (email, password, metadata) =>
-      runAuthAction(() => supabase.auth.signUp({ email, password, options: { data: metadata } })),
+      runAuthAction(
+        () => supabase.auth.signUp({ email, password, options: { data: metadata } }),
+        (error) => (isLikelyUsernameConflict(error) ? 'Username is already taken.' : error.message)
+      ),
     signIn: (email, password) =>
       runAuthAction(() => supabase.auth.signInWithPassword({ email, password })),
     // `options` is forwarded as-is to Supabase's own signOut — in

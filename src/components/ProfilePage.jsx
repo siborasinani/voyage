@@ -88,6 +88,18 @@ function ProfilePage({ currentUser, onGoToFriends, onGoToSettings }) {
           </div>
 
           <div className="profile-info-row">
+            <p className="profile-info-label">USERNAME</p>
+            {/* Read-only, on purpose — there's no edit flow for this
+                (see Fix #1's own scope: signup-only, never renamed).
+                An account created before usernames existed simply has
+                none yet, same '—' fallback Display Name above already
+                uses for its own "nothing set" case. */}
+            <p className="profile-info-value">
+              {currentUser.user_metadata?.username || '—'}
+            </p>
+          </div>
+
+          <div className="profile-info-row">
             <p className="profile-info-label">EMAIL</p>
             <p className="profile-info-value">{currentUser.email}</p>
           </div>
