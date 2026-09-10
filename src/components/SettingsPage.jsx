@@ -234,7 +234,14 @@ function SettingsPage({
           </div>
         </div>
 
-        <div className="profile-info-card">
+        {/* `profile-info-card--currency` on top of the usual
+            `profile-info-card` — this one card's own opened
+            CategorySelect menu needs to float free of the card's
+            rounded-corner `overflow: hidden` (see that rule's own
+            comment in App.css); every other `.profile-info-card`
+            elsewhere on Profile/Settings keeps that clipping exactly
+            as before. */}
+        <div className="profile-info-card profile-info-card--currency">
           <div className="profile-info-row">
             <p className="profile-info-label">DEFAULT CURRENCY</p>
             <CategorySelect

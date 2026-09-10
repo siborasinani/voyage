@@ -18,17 +18,40 @@ import { supabase } from './supabase'
 // directly in one round trip.
 const ACTIVITY_SELECT = 'id, trip_id, actor_id, subject_user_id, event_type, summary, created_at, trip:trips(name)'
 
+// "Recent" means the last 30 days, by created_at — a plain, fixed
+// window, not "however far back the newest `limit` rows happen to go".
+// Without this, a low-activity trip/account could surface something
+// weeks or months old just because nothing newer existed yet to
+// outrank it — the dashboard section would silently read as "your
+// activity history" rather than "what's new". 30 days is generous
+// enough that a normal, only-occasionally-active user doesn't land on
+// an empty section between visits, while still being unambiguously
+// "recent", not "ever". Chosen as a query condition, not a client-side
+// filter after the fact: applied via `.gte()` alongside the existing
+// `.order()`/`.limit()` in the same request, so a large historical
+// result set is never fetched into the browser just to be discarded —
+// `activity_events_created_at_idx` (0011_activity_feed.sql) already
+// supports both the ordering and this range filter efficiently.
+const RECENT_ACTIVITY_WINDOW_DAYS = 30
+
 // Every recent activity event visible to the signed-in user — RLS
 // (0011_activity_feed.sql) already restricts this to trip-scoped
 // events on trips they're currently a member of, plus friend_added
 // events they were actually a party to; no app-level filtering by
 // `currentUserId` happens here at all, it's only used to shape *how*
 // each event reads ("You added..." vs "Ada added...", "...with you"
-// vs "...with Chuck").
+// vs "...with Chuck"). Historical rows outside the recent window are
+// never touched, deleted, or modified here — this is purely a read
+// filter on what this one dashboard query returns; the same event is
+// still exactly where it's always been in `activity_events` for
+// anything else that might ever need the full history.
 export async function getRecentActivity(currentUserId, limit = 10) {
+  const windowStart = new Date(Date.now() - RECENT_ACTIVITY_WINDOW_DAYS * 24 * 60 * 60 * 1000)
+
   const { data, error } = await supabase
     .from('activity_events')
     .select(ACTIVITY_SELECT)
+    .gte('created_at', windowStart.toISOString())
     .order('created_at', { ascending: false })
     .limit(limit)
   if (error) throw error

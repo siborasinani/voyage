@@ -7,7 +7,7 @@ import {
   isPlaceSavedAnywhere,
 } from '../utils/explore'
 import { useDebouncedValue } from '../utils/useDebouncedValue'
-import { addRecentSearch, getRecentSearches } from '../utils/recentSearches'
+import { addRecentSearch, getRecentSearches, removeRecentSearch } from '../utils/recentSearches'
 import { geocodeCity, normalizePlace, searchPlacesNearCity } from '../services/geoapify'
 import { cancelPendingLookups } from '../services/pexels'
 import DestinationSearch from './DestinationSearch'
@@ -258,6 +258,18 @@ function ExplorePage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Removes exactly one Recent Searches pill — a sibling button next
+  // to the pill itself (see the JSX below), never nested inside it, so
+  // there's no click-bubbling into loadDestination to guard against:
+  // a tap on Remove and a tap on the pill are two entirely separate
+  // elements. Re-reads storage back into state afterward, same
+  // "write, then reflect the real saved list" pattern loadDestination
+  // itself already uses right below.
+  const handleRemoveRecentSearch = (city) => {
+    removeRecentSearch(city)
+    setRecentSearches(getRecentSearches())
+  }
+
   const changeDestination = () => {
     requestIdRef.current += 1 // ignore any in-flight request once we leave
     cancelPendingLookups() // drop this destination's own not-yet-started Pexels lookups too
@@ -325,14 +337,31 @@ function ExplorePage({
                   <p className="section-label">RECENT SEARCHES</p>
                   <div className="filter-row">
                     {dedupedRecentSearches.map((city) => (
-                      <button
-                        key={city}
-                        type="button"
-                        className="filter-pill"
-                        onClick={() => loadDestination(city)}
-                      >
-                        {city}
-                      </button>
+                      <span className="recent-search-item" key={city}>
+                        <button
+                          type="button"
+                          className="filter-pill"
+                          onClick={() => loadDestination(city)}
+                        >
+                          {city}
+                        </button>
+
+                        {/* A sibling of the pill above, not nested
+                            inside it — clicking this can never also
+                            trigger loadDestination. Reuses the same
+                            generic "×" remove control every other
+                            removable row in the app already uses
+                            (Saved Places, Packing, Friends, ...)
+                            rather than a new control style. */}
+                        <button
+                          type="button"
+                          className="delete-activity-button"
+                          onClick={() => handleRemoveRecentSearch(city)}
+                          aria-label={`Remove ${city} from recent searches`}
+                        >
+                          ×
+                        </button>
+                      </span>
                     ))}
                   </div>
                 </div>

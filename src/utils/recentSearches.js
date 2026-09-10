@@ -45,3 +45,22 @@ export function addRecentSearch(label) {
     // Ignore — see comment above.
   }
 }
+
+// Removes exactly one saved search (ExplorePage.jsx's own small "×" on
+// each Recent Searches pill) — every other entry keeps its existing
+// order untouched, same case-insensitive matching addRecentSearch's
+// own dedup already uses, so removing "Rome" removes it regardless of
+// whatever casing it happened to be stored with. Same silent-failure
+// tolerance as every other function here — a storage write that can't
+// happen is never worth surfacing to the user over.
+export function removeRecentSearch(label) {
+  const target = (label || '').trim().toLowerCase()
+  if (!target) return
+
+  try {
+    const next = getRecentSearches().filter((entry) => entry.toLowerCase() !== target)
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
+  } catch {
+    // Ignore — see addRecentSearch's own comment above.
+  }
+}

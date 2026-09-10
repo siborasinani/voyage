@@ -14,23 +14,21 @@ import ConfirmDialog from './ConfirmDialog'
 import SetBudget from './SetBudget'
 
 // `canEdit` (owner or editor collaborator — see TripPage.jsx's own
-// role fetch) gates budget/expense mutation controls only — a viewer
-// still sees the full expense list and Balances, just none of Add/
-// Edit/Delete expense. RLS already refuses those at the database level
-// for a viewer regardless (see 0001_init.sql's "owners and editors can
-// manage expenses"), this is purely about not showing a control that
-// would just fail.
+// role fetch) now gates only Edit/Delete on an *existing* expense —
+// still an owner/editor-only, collaborative-editing concern, unchanged
+// by 0019_viewer_budget_and_expense_permissions.sql. Setting your own
+// personal budget and adding a new expense are both available to every
+// trip member regardless of role (a viewer included), matching that
+// same migration's relaxed INSERT policies — this component simply no
+// longer hides those two controls from a viewer; RLS was always the
+// real authority either way, this is purely about not hiding a control
+// that now genuinely works.
 //
-// "My Budget" (trip.budget, via 0014_personal_trip_budgets.sql) is
-// genuinely personal — one row per (trip, user) — so a viewer sees
-// their *own* budget the same way an owner/editor does (there's
-// nothing shared left to hide), just with no Set/Edit button, since a
-// viewer was never able to set a budget even before this became
-// personal (that boundary carried over exactly, see the migration's
-// own RLS comments). In practice a pure viewer who's never been an
-// editor will simply never have a budget row at all and always see
-// the empty state below — someone demoted from editor to viewer keeps
-// seeing whatever they'd already set, read-only.
+// "My Budget" (trip.budget, via 0014_personal_trip_budgets.sql /
+// 0019's own narrowing of it) is genuinely personal — one row per
+// (trip, user) — so every trip member sees and can set their *own*
+// budget the same way, with no read-only variant left for this one
+// piece of data.
 function BudgetSection({
   trip,
   currentUserId,
@@ -147,11 +145,9 @@ function BudgetSection({
           <h2>My trip budget</h2>
         </div>
 
-        {canEdit && (
-          <button className="secondary-button" onClick={() => requireAuth(() => setShowBudgetForm(true))}>
-            {budget ? 'Edit budget' : 'Set budget'}
-          </button>
-        )}
+        <button className="secondary-button" onClick={() => requireAuth(() => setShowBudgetForm(true))}>
+          {budget ? 'Edit budget' : 'Set budget'}
+        </button>
       </div>
 
       {budget ? (
@@ -239,16 +235,10 @@ function BudgetSection({
       ) : (
         <div className="empty-state">
           <h3>No personal budget set</h3>
-          <p>
-            {canEdit
-              ? 'Set your own budget to keep track of your spending on this trip.'
-              : "You haven't set a personal budget for this trip yet."}
-          </p>
-          {canEdit && (
-            <button className="primary-button" onClick={() => requireAuth(() => setShowBudgetForm(true))}>
-              Set a budget
-            </button>
-          )}
+          <p>Set your own budget to keep track of your spending on this trip.</p>
+          <button className="primary-button" onClick={() => requireAuth(() => setShowBudgetForm(true))}>
+            Set a budget
+          </button>
         </div>
       )}
 
@@ -258,26 +248,18 @@ function BudgetSection({
           <h2>Expenses</h2>
         </div>
 
-        {canEdit && (
-          <button className="secondary-button" onClick={() => requireAuth(() => openExpenseModal({}))}>
-            + Add expense
-          </button>
-        )}
+        <button className="secondary-button" onClick={() => requireAuth(() => openExpenseModal({}))}>
+          + Add expense
+        </button>
       </div>
 
       {expenses.length === 0 ? (
         <div className="empty-state">
           <h3>No expenses yet</h3>
-          <p>
-            {canEdit
-              ? 'Add an expense to start tracking spending on this trip.'
-              : 'No expenses have been added to this trip yet.'}
-          </p>
-          {canEdit && (
-            <button className="primary-button" onClick={() => requireAuth(() => openExpenseModal({}))}>
-              Add an expense
-            </button>
-          )}
+          <p>Add an expense to start tracking spending on this trip.</p>
+          <button className="primary-button" onClick={() => requireAuth(() => openExpenseModal({}))}>
+            Add an expense
+          </button>
         </div>
       ) : (
         <ul className="expense-list">

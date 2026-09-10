@@ -2,6 +2,55 @@ import { useState } from 'react'
 import { isUsernameAvailable } from '../services/profilesRepository'
 import { getUsernameError, normalizeUsername } from '../utils/profile'
 
+// A plausibility check, not an RFC 5322 validator — this can only ever
+// catch obviously malformed/fake-looking addresses (no @, an empty
+// local part or domain, a domain with no TLD, stray whitespace,
+// consecutive/leading/trailing dots), never confirm a mailbox actually
+// exists (that needs a real confirmation email, which Supabase's own
+// signup flow already sends separately — see handleSubmit's own
+// `confirmationSent` handling below). Local to this file, unlike
+// getUsernameError: nothing else in the app needs to reuse this, same
+// as the last-name length check right above it in handleSubmit.
+// `email` must already be trimmed by the caller.
+function getEmailError(email) {
+  if (!/\s/.test(email)) {
+    const atParts = email.split('@')
+
+    if (atParts.length === 2) {
+      const [localPart, domain] = atParts
+      const domainSegments = domain.split('.')
+
+      const hasValidStructure =
+        localPart &&
+        domain &&
+        !localPart.includes('..') &&
+        !localPart.startsWith('.') &&
+        !localPart.endsWith('.') &&
+        domainSegments.length >= 2 &&
+        domainSegments.every(Boolean)
+
+      // A broad, deliberately permissive character allow-list — just
+      // enough to reject stray characters a real email never has,
+      // while still accepting the common, legitimate shapes this was
+      // tested against (a dotted local part, plus-addressing like
+      // "test+voyage@example.com", multi-segment domains like
+      // "university.edu").
+      const allowedLocalPart = /^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+$/
+      const allowedDomainSegment = /^[A-Za-z0-9-]+$/
+
+      if (
+        hasValidStructure &&
+        allowedLocalPart.test(localPart) &&
+        domainSegments.every((segment) => allowedDomainSegment.test(segment))
+      ) {
+        return ''
+      }
+    }
+  }
+
+  return 'Please enter a valid email address.'
+}
+
 // Sign in / sign up / password recovery modal — one form, one mode
 // switch, following the same modal/form conventions as CreateTrip.jsx
 // (modal-overlay > modal > modal-header + <form>) rather than
@@ -62,7 +111,7 @@ function AuthDialog({
     const firstName = (formData.get('firstName') || '').trim()
     const lastName = (formData.get('lastName') || '').trim()
     const username = normalizeUsername(formData.get('username'))
-    const email = formData.get('email')
+    const email = (formData.get('email') || '').trim()
     const password = formData.get('password')
 
     if (isSignUp && !firstName) {
@@ -72,6 +121,15 @@ function AuthDialog({
 
     if (isSignUp && !lastName) {
       setFieldError('Enter your last name.')
+      return
+    }
+
+    // `lastName` is already trimmed above, so " A " and "A" are
+    // already the same thing by the time this runs — trimming first,
+    // then checking length, is what actually prevents padding a
+    // single real character with whitespace to slip past this.
+    if (isSignUp && lastName.length < 2) {
+      setFieldError('Last name must be at least 2 characters.')
       return
     }
 
@@ -86,6 +144,18 @@ function AuthDialog({
     if (!email) {
       setFieldError('Enter your email.')
       return
+    }
+
+    // Sign-up only, run before ever attempting the real Supabase
+    // signup call below — sign-in's own email handling is untouched
+    // (a previously-accepted account email should still be able to
+    // sign in exactly as before; this only ever gates *new* accounts).
+    if (isSignUp) {
+      const emailError = getEmailError(email)
+      if (emailError) {
+        setFieldError(emailError)
+        return
+      }
     }
 
     if (!password) {

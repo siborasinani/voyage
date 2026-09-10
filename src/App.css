@@ -1351,6 +1351,19 @@ main {
   color: #171717;
 }
 
+/* Settings-only: `.back-button` itself has no bottom margin, and
+   `.profile-header` (shared with ProfilePage.jsx, which never renders
+   a `.back-button` at all) has no top margin either — the two just sit
+   directly stacked here with nothing but line-height between them.
+   Scoped to "a .back-button that's a direct child of .profile-page"
+   rather than touching either shared class: that exact combination
+   only ever occurs in SettingsPage.jsx (TripPage.jsx's own back button
+   lives in `.trip-page`, not `.profile-page`), so ProfilePage.jsx and
+   TripPage.jsx are both unaffected. */
+.profile-page > .back-button {
+  margin-bottom: 24px;
+}
+
 .trip-header {
   margin-top: 56px;
   padding-bottom: 40px;
@@ -3051,6 +3064,24 @@ main {
   padding-bottom: 4px;
 }
 
+/* One Recent Searches pill + its own small "×" — a single flex item
+   inside .filter-row (same gap between different cities as before;
+   this wrapper doesn't change that), with its own tighter internal
+   gap between the pill and its remove control. 8px, not tighter —
+   matches .place-actions/.friend-actions' own established gap for a
+   .delete-activity-button neighbor: that button's own invisible
+   hit-area expansion (see its ::after rule) reaches 4px past its
+   visible edge, so anything tighter would let a tap meant for the
+   pill's own right edge land on Remove instead. Recommended
+   Destinations/Explore Your Trips pills are untouched — this wrapper
+   only exists for Recent Searches, the one place removal was asked
+   for. */
+.recent-search-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .filter-pill {
   flex-shrink: 0;
   border: 1px solid #d9d9d6;
@@ -3762,6 +3793,22 @@ main {
   overflow: hidden;
 }
 
+/* Settings' Default Currency card only (see SettingsPage.jsx) — this
+   card's own CategorySelect menu opens *inside* it in the DOM
+   (.category-select-menu is a plain `position: absolute` popup, not a
+   portal), so the base rule's `overflow: hidden` — there specifically
+   to clip each row's own background/border to the card's rounded
+   corners — was also silently clipping the top of the open dropdown
+   itself: a flat, cut-off edge instead of the menu's own rounded
+   corners and shadow. This card has exactly one row and nothing else
+   whose visuals ever depended on that clipping, so `visible` is safe
+   here specifically; every other `.profile-info-card` (Display Name/
+   Email/Username, Change Password, Danger Zone) keeps the base rule
+   untouched. */
+.profile-info-card--currency {
+  overflow: visible;
+}
+
 .profile-info-row {
   padding: 16px 24px;
   border-bottom: 1px solid #eeeeec;
@@ -3819,6 +3866,30 @@ main {
    other field. */
 .profile-info-row .category-select {
   margin-top: 6px;
+}
+
+/* Replaces the shared component's plain-text "⌄" glyph (App.css's own
+   .category-select-chevron) with a small CSS-drawn chevron, scoped to
+   this one instance only — the text glyph's exact weight/vertical
+   centering is font-dependent and reads a little low/thin at this
+   size; a plain two-border corner is crisp at any zoom/DPI and can't
+   drift the way glyph rendering can. Purely a redraw of the same
+   affordance, same rotate-on-open behavior as the base rule — nothing
+   else about CategorySelect (or any of its other call sites —
+   AddActivity/AddExpense/AddPlace) changes. */
+.profile-info-row .category-select-chevron {
+  font-size: 0;
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-right: 1.5px solid #8c8c86;
+  border-bottom: 1.5px solid #8c8c86;
+  transform: rotate(45deg);
+  transition: transform 0.15s ease;
+}
+
+.profile-info-row .category-select-trigger[aria-expanded='true'] .category-select-chevron {
+  transform: rotate(225deg);
 }
 
 .profile-info-row .form-error {

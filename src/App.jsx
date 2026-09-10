@@ -1038,6 +1038,26 @@ function App() {
             />
           )}
 
+          {/* Signed-out only — Sign In already has its own entry point
+              (the profile circle right below, title="Sign in"), but
+              Sign Up previously had none of its own anywhere: the only
+              way to reach it was opening that same circle (which opens
+              AuthDialog in sign-in mode) and then noticing its own
+              small "Don't have an account? Sign up" toggle at the
+              bottom. This reuses the exact same AuthDialog/openAuthDialog
+              plumbing — just calling it with 'sign-up' instead of the
+              default — so there's still exactly one auth dialog, one
+              signup form, nothing new to keep in sync. */}
+          {!auth.user && (
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => openAuthDialog('sign-up')}
+            >
+              Sign up
+            </button>
+          )}
+
           <button
             className={
               'profile-button' + (view === 'profile' ? ' is-active' : '')
@@ -1053,7 +1073,12 @@ function App() {
                 className="profile-button-avatar"
               />
             ) : (
-              'S'
+              // Signed-out fallback — "V" for Voyage, not a "sign in"
+              // initial (there's no user to take an initial from yet).
+              // Same plain-text-in-button rendering as before; the
+              // Avatar component above is still only ever used for a
+              // real signed-in user.
+              'V'
             )}
           </button>
         </div>
