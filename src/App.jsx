@@ -1171,6 +1171,7 @@ function App() {
             currentUser={auth.user}
             onGoToFriends={goToFriends}
             onGoToSettings={goToSettings}
+            onSignOutClick={() => setShowSignOutConfirm(true)}
           />
         ) : (
           <main className="profile-page">

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { formatDateLabel } from '../utils/date'
 import { getCachedDestinationImage } from '../services/pexels'
 
@@ -32,11 +33,29 @@ function getTripCardImage(trip) {
 // card design.
 function TripCard({ trip, isPast = false, role, ownerName, onView }) {
   const tripImage = getTripCardImage(trip)
+  // Same onError-recovery pattern PopularDestinations.jsx's DestinationCard
+  // and Explore's own PlaceCard already use: a cached/saved URL can exist
+  // but still fail to load (an expired/removed Pexels asset, a stale
+  // saved-place photo), which would otherwise leave a permanently broken
+  // image instead of the same neutral fallback every other no-image case
+  // uses. Tracks the specific URL that failed (not just a boolean) so
+  // that if `tripImage` later resolves to a *different* URL for this
+  // same trip (e.g. a saved place gains an image, or the cache picks up
+  // a fresh pool), that new URL still gets a fair chance to load instead
+  // of inheriting a previous, unrelated URL's failure.
+  const [failedImage, setFailedImage] = useState(null)
+  const showImage = Boolean(tripImage) && tripImage !== failedImage
 
   return (
     <article className={'trip-card' + (isPast ? ' is-past' : '')}>
-      {tripImage ? (
-        <img src={tripImage} alt="" className="trip-card-image" loading="lazy" />
+      {showImage ? (
+        <img
+          src={tripImage}
+          alt=""
+          className="trip-card-image"
+          loading="lazy"
+          onError={() => setFailedImage(tripImage)}
+        />
       ) : (
         <div className="trip-card-image-fallback" aria-hidden="true" />
       )}

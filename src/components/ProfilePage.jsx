@@ -18,7 +18,7 @@ import EditProfile from './EditProfile'
 // EditProfile.jsx's own comment for the real fix. This click handler
 // is not a return to that: it still only ever opens the one existing
 // modal, never a second edit surface.
-function ProfilePage({ currentUser, onGoToFriends, onGoToSettings }) {
+function ProfilePage({ currentUser, onGoToFriends, onGoToSettings, onSignOutClick }) {
   const displayName = currentUser.user_metadata?.display_name || ''
   const avatarUrl = currentUser.user_metadata?.avatar_url || ''
   const avatarFallback = currentUser.email.charAt(0).toUpperCase()
@@ -151,6 +151,22 @@ function ProfilePage({ currentUser, onGoToFriends, onGoToSettings }) {
             onClick={onGoToSettings}
           >
             Settings
+          </button>
+
+          {/* Same sign-out flow Settings' own Account Actions section
+              already triggers — App.jsx owns the one shared
+              showSignOutConfirm/ConfirmDialog, so this is a second
+              entry point into that existing flow, not a new one. Kept
+              in this same account-actions row (not its own section)
+              so it reads as one more account action alongside Edit
+              profile/Settings, rather than competing with the profile
+              information above it. */}
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={onSignOutClick}
+          >
+            Sign out
           </button>
         </div>
       </section>
