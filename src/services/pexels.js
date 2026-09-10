@@ -430,6 +430,34 @@ async function getImagePool(city, categoryKeyword) {
   return request
 }
 
+// Warms just the "<city> travel" pool for a destination — the exact
+// tier getCachedDestinationImage checks first (see its own comment
+// below) — so a trip's TripCard can resolve a real photo the moment
+// this resolves, without that destination ever needing to be
+// separately explored on Explore first. Called once, fire-and-forget,
+// right after a trip is successfully created (see App.jsx's
+// handleCreateTrip) — deliberately the *only* new exported surface
+// this adds: a thin wrapper around the existing getImagePool, not a
+// second cache or a second fetch path. `city` is derived the exact
+// same way getCachedDestinationImage derives it from a trip's own
+// `destination` field, so the pool this warms is guaranteed to be the
+// one that lookup will actually find.
+//
+// Reuses getImagePool's own poolCache/poolInFlight as-is: an already-
+// cached or already-in-flight pool for this city resolves immediately
+// with no new request (covers two trips created for the same
+// destination, or a destination this browser already explored),
+// and getImagePool itself never rejects — a missing API key, an
+// empty/unrecognized destination, or a genuine Pexels failure all
+// resolve quietly rather than throwing, so this never needs its own
+// try/catch. Never awaited by trip creation itself — see
+// handleCreateTrip's own comment on why.
+export async function warmDestinationImageCache(destination) {
+  const city = (destination || '').split(',')[0].trim()
+  if (!city) return
+  await getImagePool(city, 'travel')
+}
+
 // Search keywords per Voyage Explore category, tuned for genuinely
 // relevant travel imagery rather than plain city scenery (e.g. an
 // actual restaurant/food photo for Restaurants, not a random Budapest

@@ -37,6 +37,7 @@ import {
 import { getIncomingFriendRequests } from './services/friendsRepository'
 import { getMyPendingInvitations } from './services/invitationsRepository'
 import { getUnreadNotifications } from './services/notificationsRepository'
+import { warmDestinationImageCache } from './services/pexels'
 import {
   deleteOwnAccount,
   getDefaultCurrency,
@@ -520,6 +521,26 @@ function App() {
       const newTrip = await createSupabaseTrip(auth.user.id, tripData)
       setTrips((currentTrips) => [...currentTrips, newTrip])
       setShowCreateTrip(false)
+
+      // Fire-and-forget: warms Pexels' destination-image pool for this
+      // trip so its own TripCard can show a real photo without this
+      // destination ever needing a separate Explore visit first (see
+      // pexels.js's warmDestinationImageCache) — never awaited here,
+      // so a slow/failed/rate-limited Pexels request can never delay
+      // or roll back a trip that's already successfully created; the
+      // .catch is defensive only (warmDestinationImageCache itself
+      // never rejects). TripCard's own getCachedDestinationImage
+      // lookup is synchronous and only ever runs at render time, so it
+      // can't pick up a pool that finishes warming *after* this trip's
+      // card already rendered with nothing cached yet — the harmless
+      // `setTrips` touch below (same trips, new array reference) is
+      // just enough to re-render that one card once the pool is
+      // ready, without a second fetch/poll of anything.
+      warmDestinationImageCache(newTrip.destination)
+        .catch(() => {})
+        .finally(() => {
+          setTrips((currentTrips) => [...currentTrips])
+        })
     } catch (error) {
       console.error('Failed to create trip', error)
     }
